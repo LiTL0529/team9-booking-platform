@@ -1,0 +1,16 @@
+# Third merchant, kept for the live demo: onboarded on stage to show that a new venue joins
+# the platform through configuration only.
+merchant:
+  name: Northpoint Arena
+  slug: northpoint-arena
+  contact_email: hello@northpoint.test
+resources:
+  - name: Arena Court 1
+    resource_type: badminton_court
+  - name: Squash Box
+    resource_type: squash_court
+schedule:
+  starts_in_days: 1
+  days: 14
+  start_hour: 8
+  end_hour: 22

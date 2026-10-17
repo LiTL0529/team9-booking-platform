@@ -35,17 +35,23 @@ def eventually(fn, what: str, timeout: float = 30):
 
 def main() -> None:
     cfg = Config()
-    day = (date.today() + timedelta(days=int(os.environ.get("SMOKE_DAYS_AHEAD", "1")))).isoformat()
     public = Api(cfg)
     alice = Api(cfg, login(cfg, os.environ.get("SMOKE_USER_A", "alice"), PASSWORD))
     bob = Api(cfg, login(cfg, os.environ.get("SMOKE_USER_B", "bob"), PASSWORD))
 
     # Security controls at the edge
-    assert httpx.get(f"{cfg.gateway}/v1/availability/slots", params={"date": day}).status_code == 403, "API key"
+    today = date.today().isoformat()
+    assert httpx.get(f"{cfg.gateway}/v1/availability/slots", params={"date": today}).status_code == 403, "API key"
     assert public.http.get("/v1/bookings").status_code == 401, "token required"
 
-    slots = public.call("GET", "/v1/availability/slots", params={"date": day}).json()["slots"]
-    assert slots, f"no available slots on {day}; onboard a merchant first"
+    # Start at SMOKE_DAYS_AHEAD and walk forward: load tests may have booked out the nearest days.
+    first = int(os.environ.get("SMOKE_DAYS_AHEAD", "1"))
+    for offset in range(first, first + 14):
+        day = (date.today() + timedelta(days=offset)).isoformat()
+        slots = public.call("GET", "/v1/availability/slots", params={"date": day}).json()["slots"]
+        if slots:
+            break
+    assert slots, f"no available slots in the 14 days from {first} days ahead; onboard a merchant first"
     slot = slots[0]
     print(f"1. found {len(slots)} slots on {day}; booking {slot['resource_name']} at {slot['start_time']}")
 
