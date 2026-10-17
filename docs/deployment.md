@@ -40,6 +40,11 @@ For GitHub Actions, set the repository variables `AWS_REGION`, `AWS_DEPLOY_ROLE_
 `ECS_CLUSTER`, `WEB_URL`, `WEB_BUCKET`, `CLOUDFRONT_DISTRIBUTION_ID`, `COGNITO_WEB_CLIENT_ID`,
 `SMOKE_USER_A`, `SMOKE_USER_B` and the secrets `WEB_API_KEY`, `SMOKE_API_KEY`, `SMOKE_PASSWORD`
 (values from `terraform output` and `.local/aws.env`).
+Deploy steps run only when `AWS_DEPLOY_ROLE_ARN` is set, the post-deploy smoke test and ZAP scan only
+when `RUN_SMOKE_TESTS=true` (turn it off while the environment is scaled to 0), and the Terraform plan job
+only when an infrastructure role `AWS_INFRA_ROLE_ARN` exists; until then infrastructure changes are applied
+from a workstation with `scripts/aws_deploy.py` (set `GITHUB_REPOSITORY` to the repository so the deploy
+role trusts it).
 
 Roll out the current commit to one service without GitHub:
 

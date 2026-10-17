@@ -36,7 +36,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.WEB_BUCKET != ''
     runs-on: ubuntu-latest
     environment: test
     steps:

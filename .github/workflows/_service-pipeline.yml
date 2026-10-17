@@ -101,17 +101,17 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
       - name: AWS credentials (OIDC)
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - name: Log in to ECR
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
       - name: Push versioned image
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
         id: push
         run: |
           IMAGE=${{ steps.ecr.outputs.registry }}/booking/$SERVICE:$IMAGE_TAG
@@ -122,7 +122,7 @@ jobs:
   deploy:
     name: deploy to test (rolling update)
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && vars.AWS_DEPLOY_ROLE_ARN != ''
     runs-on: ubuntu-latest
     environment: test
     permissions:
@@ -158,6 +158,9 @@ jobs:
   verify:
     name: smoke test and DAST
     needs: deploy
+    # The test environment is parked at 0 tasks between demos; set the repository variable
+    # RUN_SMOKE_TESTS=true while it is running (python scripts/aws_deploy.py scale --tasks 2).
+    if: vars.RUN_SMOKE_TESTS == 'true'
     runs-on: ubuntu-latest
     environment: test
     steps:

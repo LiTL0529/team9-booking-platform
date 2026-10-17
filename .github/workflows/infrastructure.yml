@@ -42,7 +42,9 @@ jobs:
 
   plan:
     needs: validate
-    if: github.ref == 'refs/heads/main'
+    # Plans need a separate infrastructure role (AWS_INFRA_ROLE_ARN); without one, infrastructure
+    # changes are applied from a workstation with scripts/aws_deploy.py.
+    if: github.ref == 'refs/heads/main' && vars.AWS_INFRA_ROLE_ARN != ''
     runs-on: ubuntu-latest
     environment: test
     steps:
