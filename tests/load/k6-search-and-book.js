@@ -14,6 +14,7 @@ import { Counter, Rate, Trend } from 'k6/metrics';
 const GATEWAY = __ENV.GATEWAY || 'http://127.0.0.1:8080';
 const API_KEY = __ENV.API_KEY || 'local-loadtest-key';
 const DAYS = parseInt(__ENV.DAYS || '2', 10);
+const START_DAY = parseInt(__ENV.START_DAY || '1', 10); // first date searched, in days from today
 const PROFILE = __ENV.PROFILE || 'full';
 
 const unexpectedErrors = new Rate('unexpected_errors');
@@ -79,7 +80,7 @@ function pick(list) {
 }
 
 function search(data) {
-  const params = { date: isoDate(1 + Math.floor(Math.random() * DAYS)) };
+  const params = { date: isoDate(START_DAY + Math.floor(Math.random() * DAYS)) };
   if (data.merchants.length && Math.random() < 0.7) params.merchant_id = pick(data.merchants);
   const qs = Object.entries(params).map(([k, v]) => `${k}=${v}`).join('&');
   const res = http.get(`${GATEWAY}/v1/availability/slots?${qs}`, {

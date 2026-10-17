@@ -6,6 +6,7 @@ Works against the local stack (dev-auth login) and AWS (Cognito USER_PASSWORD_AU
 from __future__ import annotations
 
 import os
+import time
 import uuid
 from dataclasses import dataclass
 
@@ -43,7 +44,16 @@ class Api:
         self.http = httpx.Client(base_url=cfg.gateway, headers=headers, timeout=30)
 
     def call(self, method: str, path: str, *, ok=(200, 201), **kwargs) -> httpx.Response:
-        response = self.http.request(method, path, **kwargs)
+        # Retry dropped connections (flaky client networks). Callers treat a 409 on a retried
+        # create as "already exists", so a retry never duplicates data.
+        for attempt in range(4):
+            try:
+                response = self.http.request(method, path, **kwargs)
+                break
+            except httpx.TransportError:
+                if attempt == 3:
+                    raise
+                time.sleep(1 + attempt)
         if response.status_code not in ok:
             raise RuntimeError(f"{method} {path} -> {response.status_code}: {response.text[:300]}")
         return response

@@ -47,7 +47,8 @@ resource "aws_db_parameter_group" "main" {
 resource "aws_db_instance" "main" {
   identifier                   = local.name
   engine                       = "postgres"
-  engine_version               = "16.4"
+  engine_version               = "16" # current 16.x minor; minors are retired over time
+  auto_minor_version_upgrade   = true
   instance_class               = var.db_instance_class
   allocated_storage            = 20
   max_allocated_storage        = 100

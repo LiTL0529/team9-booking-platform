@@ -98,7 +98,7 @@ resource "aws_security_group" "this" {
 }
 
 resource "aws_lb_target_group" "this" {
-  count       = var.nlb_arn == null ? 0 : 1
+  count       = var.attach_to_nlb ? 1 : 0
   name        = substr(local.full_name, 0, 32)
   port        = 8000
   protocol    = "TCP"
@@ -107,17 +107,20 @@ resource "aws_lb_target_group" "this" {
 
   deregistration_delay = 15
 
+  # Liveness only (async, no database): a saturated-but-working task must not be killed by its
+  # load balancer, which would push its load onto the remaining tasks (found in the first load test).
   health_check {
     protocol            = "HTTP"
-    path                = "/health/ready"
+    path                = "/health/live"
     interval            = 10
+    timeout             = 6
     healthy_threshold   = 2
-    unhealthy_threshold = 2
+    unhealthy_threshold = 3
   }
 }
 
 resource "aws_lb_listener" "this" {
-  count             = var.nlb_arn == null ? 0 : 1
+  count             = var.attach_to_nlb ? 1 : 0
   load_balancer_arn = var.nlb_arn
   port              = var.nlb_listener_port
   protocol          = "TCP"
@@ -197,6 +200,7 @@ resource "aws_ecs_service" "this" {
   enable_execute_command = false
   propagate_tags         = "SERVICE"
 
+  health_check_grace_period_seconds  = 60
   deployment_minimum_healthy_percent = 100
   deployment_maximum_percent         = 200
 
@@ -213,7 +217,7 @@ resource "aws_ecs_service" "this" {
   }
 
   dynamic "load_balancer" {
-    for_each = var.nlb_arn == null ? [] : [1]
+    for_each = var.attach_to_nlb ? [1] : []
     content {
       target_group_arn = aws_lb_target_group.this[0].arn
       container_name   = "app"
@@ -272,7 +276,7 @@ resource "aws_appautoscaling_policy" "cpu" {
 
 # Backlog per task = visible messages / running tasks (AWS-recommended SQS scaling metric).
 resource "aws_appautoscaling_policy" "backlog" {
-  count              = var.queue_name == null ? 0 : 1
+  count              = var.scale_on_queue ? 1 : 0
   name               = "${local.full_name}-sqs-backlog"
   service_namespace  = aws_appautoscaling_target.this.service_namespace
   resource_id        = aws_appautoscaling_target.this.resource_id

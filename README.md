@@ -118,8 +118,8 @@ See [docs/testing.md](docs/testing.md) for what each test proves and the results
 
 ## Deploy to AWS
 
-See [docs/deployment.md](docs/deployment.md). In short: `scripts/aws_bootstrap.sh state`,
-`terraform apply`, `scripts/aws_bootstrap.sh images|database|users`, then every push to `main`
+See [docs/deployment.md](docs/deployment.md). In short: `python scripts/aws_deploy.py all` (images are
+built in AWS CodeBuild, no local Docker needed), then every push to `main`
 runs the per-service pipeline: lint → tests → SAST/secrets/dependencies → image build + Trivy →
 push to ECR → rolling ECS deployment → smoke test + OWASP ZAP baseline.
 

@@ -31,8 +31,8 @@ def _slot_values(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def build_handlers(cache: AvailabilityCache):
-    def invalidate_after_commit(session: Session, day: str) -> None:
-        session.info.setdefault("after_commit", []).append(lambda: cache.invalidate(day))
+    def invalidate_after_commit(session: Session, day: str, merchant_id: str) -> None:
+        session.info.setdefault("after_commit", []).append(lambda: cache.invalidate(day, merchant_id))
 
     def on_merchant_onboarded(session: Session, envelope: dict[str, Any]) -> None:
         data = envelope["data"]
@@ -54,7 +54,7 @@ def build_handlers(cache: AvailabilityCache):
                 set_={k: getattr(stmt.excluded, k) for k in values if k != "slot_id"},
             )
         )
-        invalidate_after_commit(session, data["local_date"])
+        invalidate_after_commit(session, data["local_date"], data["merchant_id"])
 
     def on_booking_change(status: str):
         def handler(session: Session, envelope: dict[str, Any]) -> None:
@@ -67,7 +67,7 @@ def build_handlers(cache: AvailabilityCache):
                     where=SlotView.version < stmt.excluded.version,
                 )
             )
-            invalidate_after_commit(session, data["local_date"])
+            invalidate_after_commit(session, data["local_date"], data["merchant_id"])
 
         return handler
 

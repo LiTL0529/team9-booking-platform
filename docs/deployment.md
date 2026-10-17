@@ -9,31 +9,43 @@
 
 ## First deployment to AWS
 
-Prerequisites: AWS CLI with admin credentials for the account, Terraform ≥ 1.6, Docker.
+Prerequisites: AWS CLI configured with credentials for the target account (`aws configure`),
+Terraform >= 1.6, Python venv with `boto3`, Node.js. Docker is **not** needed locally: images are
+built in AWS CodeBuild (`infra/terraform/envs/test/build.tf`).
 
-1. **State backend** — `./scripts/aws_bootstrap.sh state`, then copy
-   `infra/terraform/envs/test/backend.hcl.example` to `backend.hcl` with the bucket name.
-2. **Infrastructure** — copy `test.tfvars.example` to `test.tfvars`, then
-   ```bash
-   terraform -chdir=infra/terraform/envs/test init -backend-config=backend.hcl
-   ```
-   ```bash
-   terraform -chdir=infra/terraform/envs/test apply -var-file=test.tfvars
-   ```
-   ECS services start once their first image exists (next step).
-3. **First images** — `./scripts/aws_bootstrap.sh images` (pushes tag `bootstrap`).
-4. **Databases** — `./scripts/aws_bootstrap.sh database` runs the one-off ECS task that creates
-   one database and login per service, then force a new deployment of the services.
-5. **Users** — `DEMO_PASSWORD=... ./scripts/aws_bootstrap.sh users`.
-6. **GitHub** — repository variables: `AWS_REGION`, `AWS_DEPLOY_ROLE_ARN`, `ECS_CLUSTER`,
-   `WEB_URL`, `WEB_BUCKET`, `CLOUDFRONT_DISTRIBUTION_ID`, `COGNITO_WEB_CLIENT_ID`,
-   `SMOKE_USER_A`, `SMOKE_USER_B`; secrets: `WEB_API_KEY`, `SMOKE_API_KEY`, `SMOKE_PASSWORD`
-   (all values come from `terraform output`). Protect the `test` environment with required reviewers
-   if promotions should be approved.
-7. **Onboard merchants** —
-   ```bash
-   PLATFORM_GATEWAY=<web_url> PLATFORM_API_KEY=<web key> COGNITO_CLIENT_ID=<web client> python scripts/onboard_merchant.py merchants/city-courts.yaml
-   ```
+```bash
+DEMO_PASSWORD='<8+ chars, upper, lower, digit>' python scripts/aws_deploy.py all
+```
+
+`all` runs these steps, each of which can also be run on its own:
+
+| Step | What it does |
+|---|---|
+| `state` | S3 state bucket + DynamoDB lock table, writes `backend.hcl`, `terraform init` |
+| `base` | network, RDS, ECR, secrets, CodeBuild and the bootstrap task (no services yet) |
+| `images` | zips the source, CodeBuild builds and pushes the five images tagged with the commit |
+| `database` | one-off ECS task: one database and login per service |
+| `infra` | full `terraform apply`; waits until every ECS service is stable |
+| `users` | demo users in Cognito with `DEMO_PASSWORD` |
+| `web` | builds the web app, writes `config.json` (API key, Cognito client), publishes to S3 + CloudFront |
+| `env` | writes `.local/aws.env` (URLs, API keys) for the test scripts |
+
+Then onboard merchants against the cloud gateway (values from `.local/aws.env`):
+
+```bash
+python scripts/onboard_merchant.py merchants/city-courts.yaml
+```
+
+For GitHub Actions, set the repository variables `AWS_REGION`, `AWS_DEPLOY_ROLE_ARN`,
+`ECS_CLUSTER`, `WEB_URL`, `WEB_BUCKET`, `CLOUDFRONT_DISTRIBUTION_ID`, `COGNITO_WEB_CLIENT_ID`,
+`SMOKE_USER_A`, `SMOKE_USER_B` and the secrets `WEB_API_KEY`, `SMOKE_API_KEY`, `SMOKE_PASSWORD`
+(values from `terraform output` and `.local/aws.env`).
+
+Roll out the current commit to one service without GitHub:
+
+```bash
+python scripts/aws_deploy.py release booking
+```
 
 ## Pipeline (per service)
 
@@ -68,13 +80,17 @@ aws ecs update-service --cluster booking-test --service booking --task-definitio
 
 ## Cost control
 
-Set every service to zero tasks when not testing:
+Stop every service when not testing (sets the auto scaling limits too), and resume later:
 
 ```bash
-for s in merchant catalogue availability booking notification; do aws ecs update-service --cluster booking-test --service $s --desired-count 0 >/dev/null; done
+python scripts/aws_deploy.py scale --tasks 0
 ```
 
-(also set the auto scaling minimum to 0, or `terraform apply -var 'service_scaling={...min=0...}'`).
+```bash
+python scripts/aws_deploy.py scale --tasks 2
+```
+
+RDS, Redis, the NAT gateway and the NLB keep billing while stopped (about 0.25 USD/hour).
 `terraform destroy` removes everything except the state bucket.
 
 ## Operations

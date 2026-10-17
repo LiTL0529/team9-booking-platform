@@ -45,20 +45,36 @@ def main() -> None:
     def seed_merchant(i: int) -> int:
         api = Api(cfg, token)
         slug = f"{args.prefix}-merchant-{i:03d}"
-        merchant = existing.get(slug) or api.call(
-            "POST",
-            "/v1/merchants",
-            json={"name": f"Load Test Venue {i:03d}", "slug": slug, "contact_email": f"{slug}@load.test"},
-        ).json()
-        have = {r["name"]: r for r in api.call("GET", "/v1/resources", params={"merchant_id": merchant["merchant_id"]}).json()}
+        merchant = existing.get(slug)
+        if merchant is None:
+            response = api.call(
+                "POST",
+                "/v1/merchants",
+                ok=(201, 409),
+                json={"name": f"Load Test Venue {i:03d}", "slug": slug, "contact_email": f"{slug}@load.test"},
+            )
+            # 409: an earlier attempt already created it before the connection dropped
+            merchant = response.json() if response.status_code == 201 else next(
+                m for m in api.call("GET", "/v1/merchants").json() if m["slug"] == slug
+            )
+
+        def resources() -> dict:
+            return {r["name"]: r for r in api.call("GET", "/v1/resources", params={"merchant_id": merchant["merchant_id"]}).json()}
+
+        have = resources()
         created = 0
         for r in range(args.resources):
             name = f"Court {r + 1:02d}"
-            resource = have.get(name) or api.call(
-                "POST",
-                "/v1/resources",
-                json={"merchant_id": merchant["merchant_id"], "name": name, "resource_type": RESOURCE_TYPES[r % len(RESOURCE_TYPES)]},
-            ).json()
+            resource = have.get(name)
+            if resource is None:
+                response = api.call(
+                    "POST",
+                    "/v1/resources",
+                    ok=(201, 409),
+                    json={"merchant_id": merchant["merchant_id"], "name": name,
+                          "resource_type": RESOURCE_TYPES[r % len(RESOURCE_TYPES)]},
+                )
+                resource = response.json() if response.status_code == 201 else resources()[name]
             created += api.call(
                 "POST",
                 f"/v1/resources/{resource['resource_id']}/slots",

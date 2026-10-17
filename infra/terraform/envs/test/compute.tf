@@ -104,8 +104,8 @@ locals {
       COGNITO_USER_POOL_ID = aws_cognito_user_pool.main.id
     }
     catalogue    = {}
-    availability = { CONSUMER_CONCURRENCY = "2" }
-    booking      = { CATALOGUE_URL = "http://catalogue:8000" }
+    availability = { CONSUMER_CONCURRENCY = "2", DB_POOL_SIZE = "10" }
+    booking      = { CATALOGUE_URL = "http://catalogue:8000", DB_POOL_SIZE = "10" }
     notification = { CONSUMER_CONCURRENCY = "2" }
   }
 }
@@ -128,6 +128,8 @@ module "service" {
   max_tasks                     = var.service_scaling[each.key].max
   nlb_arn                       = aws_lb.internal.arn
   nlb_listener_port             = each.value.port
+  attach_to_nlb                 = true
+  scale_on_queue                = each.key == "notification"
   queue_name                    = each.key == "notification" ? aws_sqs_queue.events["notification-events"].name : null
   task_policy_json              = data.aws_iam_policy_document.task[each.key].json
 

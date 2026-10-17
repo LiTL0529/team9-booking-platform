@@ -138,10 +138,14 @@ def create_service_app(
             )
         return response
 
+    # Liveness is async on purpose: it answers on the event loop even when every worker thread is
+    # busy with requests, so a saturated-but-working task is not mistaken for a dead one by the
+    # load balancer (which would kill it and push its load onto the remaining tasks).
     @app.get("/health/live", include_in_schema=False)
-    def live():
+    async def live():
         return {"status": "ok", "service": settings.service_name, "host": HOSTNAME}
 
+    # Readiness checks the database; used for diagnostics and smoke tests, not for load balancing.
     @app.get("/health/ready", include_in_schema=False)
     def ready():
         if not db.ping():

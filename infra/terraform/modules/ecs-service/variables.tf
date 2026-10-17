@@ -62,8 +62,9 @@ variable "max_tasks" {
 }
 
 variable "cpu_target_percent" {
-  type    = number
-  default = 60
+  description = "Scale out early: small tasks queue requests quickly once CPU is high"
+  type        = number
+  default     = 50
 }
 
 variable "environment_variables" {
@@ -80,6 +81,18 @@ variable "secrets" {
 variable "task_policy_json" {
   description = "Least-privilege IAM policy for the task role"
   type        = string
+}
+
+variable "attach_to_nlb" {
+  description = "Expose the service through the internal NLB (must be known at plan time)"
+  type        = bool
+  default     = true
+}
+
+variable "scale_on_queue" {
+  description = "Also scale on SQS backlog per task (queue_name required)"
+  type        = bool
+  default     = false
 }
 
 variable "nlb_arn" {

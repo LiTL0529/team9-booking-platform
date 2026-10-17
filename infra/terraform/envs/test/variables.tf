@@ -40,17 +40,17 @@ variable "github_repository" {
 }
 
 variable "service_scaling" {
-  description = "Per-service task limits"
+  description = "Per-service task limits (0.25 vCPU each). Defaults fit a new account's 6 vCPU Fargate quota with room for rolling deployments; raise them after a quota increase."
   type = map(object({
     min = number
     max = number
   }))
   default = {
-    merchant     = { min = 2, max = 4 }
-    catalogue    = { min = 2, max = 4 }
-    availability = { min = 2, max = 10 }
-    booking      = { min = 2, max = 8 }
-    notification = { min = 2, max = 8 }
+    merchant     = { min = 2, max = 2 }
+    catalogue    = { min = 2, max = 2 }
+    availability = { min = 2, max = 6 }
+    booking      = { min = 2, max = 5 }
+    notification = { min = 2, max = 5 }
   }
 }
 

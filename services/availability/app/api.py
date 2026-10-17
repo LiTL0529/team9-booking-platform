@@ -66,7 +66,7 @@ def search_slots(
 ):
     cache = request.app.state.cache
     day = date_.isoformat()
-    key, cached = cache.get(day, (merchant_id, resource_type, int(include_booked), limit, offset))
+    key, cached = cache.get(day, merchant_id, (resource_type, int(include_booked), limit, offset))
     if cached is not None:
         # Popular searches are served straight from the cache as pre-serialised JSON.
         return Response(content=cached, media_type="application/json", headers={"X-Cache": "HIT"})

@@ -28,13 +28,15 @@ def test_search_across_merchants_with_filters(ctx):
 
 
 def test_booked_slot_disappears_and_returns_after_cancellation(ctx):
-    s = slot(str(uuid.uuid4()))
+    merchant = str(uuid.uuid4())
+    s = slot(merchant)
     ctx.emit("SlotPublished", s)
     ctx.emit("BookingConfirmed", booking_event(s, 1))
-    assert search(ctx, s["local_date"]).json()["count"] == 0
-    assert search(ctx, s["local_date"], include_booked=True).json()["slots"][0]["status"] == "BOOKED"
+    day = s["local_date"]
+    assert search(ctx, day, merchant_id=merchant).json()["count"] == 0
+    assert search(ctx, day, merchant_id=merchant, include_booked=True).json()["slots"][0]["status"] == "BOOKED"
     ctx.emit("BookingCancelled", {**booking_event(s, 2), "cancelled_at": s["start_time"]})
-    assert search(ctx, s["local_date"]).json()["count"] == 1
+    assert search(ctx, day, merchant_id=merchant).json()["count"] == 1
 
 
 def test_out_of_order_events_converge(ctx):
@@ -47,16 +49,30 @@ def test_out_of_order_events_converge(ctx):
     assert result["slots"][0]["status"] == "AVAILABLE"
 
 
-def test_cache_hit_and_invalidation_on_events(ctx):
+def test_merchant_search_cache_is_invalidated_by_that_merchants_events_only(ctx):
+    m1, m2 = str(uuid.uuid4()), str(uuid.uuid4())
+    s1, s2 = slot(m1), slot(m2)
+    ctx.emit("SlotPublished", s1)
+    ctx.emit("SlotPublished", s2)
+    day = s1["local_date"]
+    assert search(ctx, day, merchant_id=m1).headers["X-Cache"] == "MISS"
+    assert search(ctx, day, merchant_id=m2).headers["X-Cache"] == "MISS"
+    assert search(ctx, day, merchant_id=m1).headers["X-Cache"] == "HIT"
+    ctx.emit("BookingConfirmed", booking_event(s1, 1))
+    fresh = search(ctx, day, merchant_id=m1)
+    assert fresh.headers["X-Cache"] == "MISS"
+    assert fresh.json()["count"] == 0
+    assert search(ctx, day, merchant_id=m2).headers["X-Cache"] == "HIT"  # other merchant untouched
+
+
+def test_cross_merchant_search_is_cached_with_bounded_staleness(ctx):
     s = slot(str(uuid.uuid4()))
     ctx.emit("SlotPublished", s)
     day = s["local_date"]
     assert search(ctx, day).headers["X-Cache"] == "MISS"
-    assert search(ctx, day).headers["X-Cache"] == "HIT"
     ctx.emit("BookingConfirmed", booking_event(s, 1))
-    response = search(ctx, day)
-    assert response.headers["X-Cache"] == "MISS"
-    assert response.json()["count"] == 0
+    # served from cache until its short TTL expires; Booking answers 409 if this stale slot is picked
+    assert search(ctx, day).headers["X-Cache"] == "HIT"
 
 
 def test_search_requires_a_date(ctx):

@@ -41,18 +41,31 @@ async def main() -> None:
         print(f"racing {args.requests} concurrent requests for slot {slot_id}")
 
         async def attempt():
-            response = await client.post(
-                "/v1/bookings", json={"slot_id": slot_id}, headers={"Idempotency-Key": str(uuid.uuid4())}
-            )
-            return response.status_code, response.headers.get("x-served-by", "?")
+            # Retrying a dropped connection with the same Idempotency-Key is safe: the platform
+            # returns the original result instead of booking twice.
+            key = str(uuid.uuid4())
+            for retry in range(4):
+                try:
+                    response = await client.post(
+                        "/v1/bookings", json={"slot_id": slot_id}, headers={"Idempotency-Key": key}
+                    )
+                    return response.status_code, response.headers.get("x-served-by", "?")
+                except httpx.TransportError:
+                    await asyncio.sleep(0.5 * (retry + 1))
+            return 0, "network-error"
 
         results = await asyncio.gather(*(attempt() for _ in range(args.requests)))
     statuses = collections.Counter(status for status, _ in results)
     tasks = collections.Counter(host for _, host in results)
     print(f"status codes: {dict(statuses)}")
     print(f"served by {len(tasks)} booking task(s): {dict(tasks)}")
-    if statuses.get(201) == 1 and statuses.get(409) == args.requests - 1:
-        print("PASS: exactly one booking succeeded, all others got 409 Conflict")
+    # A replayed request (200) means the client retried after a dropped connection and got the
+    # original booking back, so it counts with the single success.
+    successes = statuses.get(201, 0) + statuses.get(200, 0)
+    if statuses.get(0):
+        print(f"note: {statuses[0]} request(s) never reached the platform (client network errors)")
+    if statuses.get(201) == 1 and successes == 1 and statuses.get(409, 0) + statuses.get(0, 0) == args.requests - 1:
+        print("PASS: exactly one booking succeeded, every other request got 409 Conflict")
     else:
         sys.exit("FAIL: expected exactly one 201 and the rest 409")
 

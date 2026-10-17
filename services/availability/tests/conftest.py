@@ -24,15 +24,19 @@ class FakeCache:
     def __init__(self):
         self.store, self.generations = {}, {}
 
-    def get(self, day, parts):
-        key = f"{day}:{self.generations.get(day, 0)}:{parts}"
+    def get(self, day, merchant_id, parts):
+        if merchant_id is None:  # cross-merchant searches are TTL-only, never invalidated
+            key = f"{day}:all:{parts}"
+        else:
+            key = f"{day}:{merchant_id}:{self.generations.get((day, str(merchant_id)), 0)}:{parts}"
         return key, self.store.get(key)
 
     def put(self, key, value):
         self.store[key] = value
 
-    def invalidate(self, day):
-        self.generations[day] = self.generations.get(day, 0) + 1
+    def invalidate(self, day, merchant_id):
+        k = (day, str(merchant_id))
+        self.generations[k] = self.generations.get(k, 0) + 1
 
 
 @pytest.fixture(scope="session")
