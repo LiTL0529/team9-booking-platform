@@ -94,7 +94,7 @@ jobs:
           docker build -f docker/service.Dockerfile --build-arg SERVICE=$SERVICE --build-arg VERSION=$IMAGE_TAG \
             -t $SERVICE:$IMAGE_TAG .
       - name: Scan image (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0 (pinned by commit: release tags have been re-pointed before)
         with:
           image-ref: ${{ inputs.service }}:${{ github.sha }}
           severity: CRITICAL,HIGH
