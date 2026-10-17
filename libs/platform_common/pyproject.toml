@@ -8,21 +8,22 @@ version = "1.0.0"
 description = "Shared service template for the Multi Merchant Appointment Booking Platform"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi==0.115.12",
+    "fastapi==0.141.1",
+    "starlette==1.7.0",  # pinned above the versions with known advisories
     "uvicorn[standard]==0.34.2",
     "sqlalchemy==2.0.43",
     "psycopg[binary]==3.2.9",
     "pydantic-settings==2.7.1",
-    "pyjwt[crypto]==2.10.1",
+    "pyjwt[crypto]==2.15.1",
     "boto3==1.35.90",
     "httpx==0.28.1",
     "tzdata==2024.2",
-    "opentelemetry-api==1.29.0",
-    "opentelemetry-sdk==1.29.0",
-    "opentelemetry-exporter-otlp-proto-http==1.29.0",
-    "opentelemetry-instrumentation-fastapi==0.50b0",
-    "opentelemetry-instrumentation-sqlalchemy==0.50b0",
-    "opentelemetry-instrumentation-httpx==0.50b0",
+    "opentelemetry-api==1.44.0",
+    "opentelemetry-sdk==1.44.0",
+    "opentelemetry-exporter-otlp-proto-http==1.44.0",
+    "opentelemetry-instrumentation-fastapi==0.65b0",
+    "opentelemetry-instrumentation-sqlalchemy==0.65b0",
+    "opentelemetry-instrumentation-httpx==0.65b0",
     "opentelemetry-sdk-extension-aws==2.0.2",
 ]
 
