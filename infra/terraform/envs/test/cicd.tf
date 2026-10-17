@@ -6,6 +6,18 @@ resource "aws_iam_openid_connect_provider" "github" {
   thumbprint_list = ["6938fd4d98bab03faadb97b34396831e3780aea1"]
 }
 
+locals {
+  # GitHub's OIDC subject names the repository either as owner/repo or, for newer repositories,
+  # with the immutable account and repository ids: owner@<owner id>/repo@<repo id>. Accept both,
+  # spelled out exactly (no wildcards that would also match look-alike owner names).
+  github_owner = split("/", var.github_repository)[0]
+  github_repo  = split("/", var.github_repository)[1]
+  github_subject_repos = compact([
+    var.github_repository,
+    var.github_repository_id == "" ? "" : "${local.github_owner}@${var.github_owner_id}/${local.github_repo}@${var.github_repository_id}",
+  ])
+}
+
 resource "aws_iam_role" "deploy" {
   name = "${local.name}-github-deploy"
   assume_role_policy = jsonencode({
@@ -18,10 +30,12 @@ resource "aws_iam_role" "deploy" {
         StringEquals = { "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com" }
         # Only workflows on main (or the protected "test" environment) of this repository
         StringLike = {
-          "token.actions.githubusercontent.com:sub" = [
-            "repo:${var.github_repository}:ref:refs/heads/main",
-            "repo:${var.github_repository}:environment:test",
-          ]
+          "token.actions.githubusercontent.com:sub" = flatten([
+            for repo in local.github_subject_repos : [
+              "repo:${repo}:ref:refs/heads/main",
+              "repo:${repo}:environment:test",
+            ]
+          ])
         }
       }
     }]

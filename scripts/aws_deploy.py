@@ -81,8 +81,13 @@ def tf_outputs() -> dict:
 
 
 def tfvars(tag: str) -> list[str]:
-    repo = os.environ.get("GITHUB_REPOSITORY", "team9/booking-platform")
-    return ["-var", f"image_tag={tag}", "-var", f"github_repository={repo}", "-var", f"region={REGION}"]
+    repo = os.environ.get("GITHUB_REPOSITORY", "LiTL0529/team9-booking-platform")
+    args = ["-var", f"image_tag={tag}", "-var", f"github_repository={repo}", "-var", f"region={REGION}"]
+    # Newer GitHub OIDC subjects carry numeric ids: owner@<id>/repo@<id> (see infra cicd.tf)
+    for var, env in (("github_owner_id", "GITHUB_OWNER_ID"), ("github_repository_id", "GITHUB_REPOSITORY_ID")):
+        if os.environ.get(env):
+            args += ["-var", f"{var}={os.environ[env]}"]
+    return args
 
 
 # --- steps --------------------------------------------------------------------------------------

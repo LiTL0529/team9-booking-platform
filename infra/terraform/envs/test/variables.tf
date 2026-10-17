@@ -39,6 +39,18 @@ variable "github_repository" {
   type        = string
 }
 
+variable "github_owner_id" {
+  description = "Numeric GitHub account id of the owner (newer OIDC subjects carry it)"
+  type        = string
+  default     = ""
+}
+
+variable "github_repository_id" {
+  description = "Numeric GitHub repository id (newer OIDC subjects carry it); empty = owner/repo form only"
+  type        = string
+  default     = ""
+}
+
 variable "service_scaling" {
   description = "Per-service task limits (0.25 vCPU each). Defaults fit a new account's 6 vCPU Fargate quota with room for rolling deployments; raise them after a quota increase."
   type = map(object({

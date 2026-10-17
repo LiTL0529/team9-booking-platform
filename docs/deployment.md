@@ -43,8 +43,9 @@ For GitHub Actions, set the repository variables `AWS_REGION`, `AWS_DEPLOY_ROLE_
 Deploy steps run only when `AWS_DEPLOY_ROLE_ARN` is set, the post-deploy smoke test and ZAP scan only
 when `RUN_SMOKE_TESTS=true` (turn it off while the environment is scaled to 0), and the Terraform plan job
 only when an infrastructure role `AWS_INFRA_ROLE_ARN` exists; until then infrastructure changes are applied
-from a workstation with `scripts/aws_deploy.py` (set `GITHUB_REPOSITORY` to the repository so the deploy
-role trusts it).
+from a workstation with `scripts/aws_deploy.py`. Set `GITHUB_REPOSITORY` (owner/repo) and, because GitHub's
+OIDC subject for newer repositories carries numeric ids, `GITHUB_OWNER_ID` and `GITHUB_REPOSITORY_ID`
+(`gh api repos/<owner>/<repo> --jq '.owner.id, .id'`) so the deploy role trusts the repository.
 
 Roll out the current commit to one service without GitHub:
 
