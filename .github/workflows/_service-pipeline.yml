@@ -1,0 +1,185 @@
+# Reusable DevSecOps pipeline, called by one small workflow per microservice.
+# Each service is tested, scanned, built and deployed on its own, so a change to one service
+# never redeploys the others.
+name: service-pipeline
+
+on:
+  workflow_call:
+    inputs:
+      service:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  SERVICE: ${{ inputs.service }}
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  test:
+    name: lint, unit, integration and contract tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      TEST_PG_URL: postgresql+psycopg://postgres:postgres@localhost:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install
+        run: |
+          pip install ./libs/platform_common -r services/$SERVICE/requirements.txt -r requirements-dev.txt
+      - name: Lint
+        run: ruff check libs/platform_common services/$SERVICE
+      - name: Shared template tests
+        working-directory: libs/platform_common
+        run: pytest -q
+      - name: Service tests (unit, database integration, OpenAPI and event contract tests)
+        working-directory: services/${{ inputs.service }}
+        run: pytest -q --junitxml=../../test-results-${{ inputs.service }}.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ inputs.service }}
+          path: test-results-${{ inputs.service }}.xml
+
+  security:
+    name: static analysis, secrets and dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Secret detection (gitleaks)
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 \
+            detect --source /repo --no-banner --redact --config /repo/.gitleaks.toml
+      - name: Static analysis (bandit)
+        run: |
+          pip install bandit==1.8.0
+          bandit -q -r services/$SERVICE/app libs/platform_common/platform_common -ll
+      - name: Dependency vulnerabilities (pip-audit)
+        run: |
+          pip install pip-audit==2.7.3 ./libs/platform_common -r services/$SERVICE/requirements.txt
+          pip-audit --skip-editable --progress-spinner off
+
+  build:
+    name: build and scan image
+    needs: [test, security]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.push.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          docker build -f docker/service.Dockerfile --build-arg SERVICE=$SERVICE --build-arg VERSION=$IMAGE_TAG \
+            -t $SERVICE:$IMAGE_TAG .
+      - name: Scan image (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ inputs.service }}:${{ github.sha }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: AWS credentials (OIDC)
+        if: github.ref == 'refs/heads/main'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Log in to ECR
+        if: github.ref == 'refs/heads/main'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - name: Push versioned image
+        if: github.ref == 'refs/heads/main'
+        id: push
+        run: |
+          IMAGE=${{ steps.ecr.outputs.registry }}/booking/$SERVICE:$IMAGE_TAG
+          docker tag $SERVICE:$IMAGE_TAG $IMAGE
+          docker push $IMAGE
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: deploy to test (rolling update)
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: test
+    permissions:
+      contents: read
+      id-token: write
+    concurrency: deploy-${{ inputs.service }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Current task definition
+        run: |
+          aws ecs describe-task-definition --task-definition ${{ vars.ENVIRONMENT || 'test' }}-$SERVICE \
+            --query taskDefinition > task-definition.json
+      - name: New revision with the new image
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: app
+          image: ${{ needs.build.outputs.image }}
+          environment-variables: SERVICE_VERSION=${{ github.sha }}
+      - name: Rolling deployment (circuit breaker rolls back on failure)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          service: ${{ inputs.service }}
+          wait-for-service-stability: true
+          wait-for-minutes: 15
+
+  verify:
+    name: smoke test and DAST
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: End-to-end smoke test
+        env:
+          PLATFORM_GATEWAY: ${{ vars.WEB_URL }}
+          PLATFORM_API_KEY: ${{ secrets.SMOKE_API_KEY }}
+          COGNITO_CLIENT_ID: ${{ vars.COGNITO_WEB_CLIENT_ID }}
+          SMOKE_USER_A: ${{ vars.SMOKE_USER_A }}
+          SMOKE_USER_B: ${{ vars.SMOKE_USER_B }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+        run: |
+          pip install httpx==0.28.1 boto3==1.35.90 pyyaml==6.0.2
+          python tests/e2e/smoke_test.py
+      - name: OWASP ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: ${{ vars.WEB_URL }}
+          rules_file_name: .zap/rules.tsv
+          allow_issue_writing: false
+          fail_action: false

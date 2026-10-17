@@ -1,0 +1,14 @@
+# Secret detection. Local development credentials are deliberately fake and allow-listed here;
+# real credentials only ever live in AWS Secrets Manager / GitHub secrets.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "local-only development fixtures"
+paths = [
+  '''local/dev-auth/users\.json''',
+  '''local/postgres/init\.sql''',
+  '''docker-compose\.yml''',
+  '''scripts/dev_native\.py''',
+  '''web/public/config\.json''',
+]

@@ -1,0 +1,32 @@
+name: notification-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/notification/**
+      - libs/platform_common/**
+      - contracts/**
+      - docker/service.Dockerfile
+      - .github/workflows/notification.yml
+      - .github/workflows/_service-pipeline.yml
+  pull_request:
+    paths:
+      - services/notification/**
+      - libs/platform_common/**
+      - contracts/**
+      - docker/service.Dockerfile
+      - .github/workflows/notification.yml
+      - .github/workflows/_service-pipeline.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_service-pipeline.yml
+    with:
+      service: notification
+    secrets: inherit

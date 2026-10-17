@@ -1,0 +1,20 @@
+line-length = 135
+target-version = "py311"
+extend-exclude = [".venv", ".local", "web", "infra"]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "BLE"]
+ignore = [
+    "B008",  # FastAPI Depends() in defaults is the framework's idiom
+    "S608",  # SQL is built only from validated identifiers (db_bootstrap)
+]
+
+[lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106"]
+"tests/**" = ["S101", "S311"]
+"scripts/**" = ["S603", "S607", "S105", "S106", "S310", "BLE001"]
+"local/**" = ["S105", "S108"]
+"**/testing.py" = ["S101"]
+
+[lint.isort]
+known-first-party = ["platform_common", "app"]

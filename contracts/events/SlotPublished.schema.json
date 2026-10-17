@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://booking-platform/contracts/events/SlotPublished.schema.json",
+  "title": "SlotPublished",
+  "description": "Published by the Catalogue Service for every new bookable one-hour slot.",
+  "type": "object",
+  "properties": {
+    "slot_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "merchant_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "resource_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "resource_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resource_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "end_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "local_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "timezone": {
+      "type": "string",
+      "minLength": 1
+    },
+    "capacity": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "required": [
+    "slot_id",
+    "merchant_id",
+    "resource_id",
+    "resource_name",
+    "resource_type",
+    "start_time",
+    "end_time",
+    "local_date",
+    "timezone",
+    "capacity"
+  ],
+  "additionalProperties": false
+}

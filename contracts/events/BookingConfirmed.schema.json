@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://booking-platform/contracts/events/BookingConfirmed.schema.json",
+  "title": "BookingConfirmed",
+  "description": "Published by the Booking Service when a slot is reserved.",
+  "type": "object",
+  "properties": {
+    "booking_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "reference": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slot_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "customer_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "customer_username": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slot_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "merchant_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "resource_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "resource_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resource_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "start_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "end_time": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "local_date": {
+      "type": "string",
+      "format": "date"
+    }
+  },
+  "required": [
+    "booking_id",
+    "reference",
+    "slot_version",
+    "customer_id",
+    "customer_username",
+    "slot_id",
+    "merchant_id",
+    "resource_id",
+    "resource_name",
+    "resource_type",
+    "start_time",
+    "end_time",
+    "local_date"
+  ],
+  "additionalProperties": false
+}

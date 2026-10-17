@@ -1,0 +1,23 @@
+# First merchant (seed). Onboard with: python scripts/onboard_merchant.py merchants/city-courts.yaml
+merchant:
+  name: City Courts
+  slug: city-courts
+  contact_email: ops@citycourts.test
+members:
+  - username: owner1
+    role: merchant_admin
+resources:
+  - name: Badminton Court 1
+    resource_type: badminton_court
+    description: Indoor, wooden floor
+  - name: Badminton Court 2
+    resource_type: badminton_court
+    description: Indoor, wooden floor
+  - name: Tennis Court A
+    resource_type: tennis_court
+    description: Outdoor hard court with lights
+schedule:
+  starts_in_days: 1
+  days: 14
+  start_hour: 8
+  end_hour: 22

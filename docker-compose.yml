@@ -1,0 +1,145 @@
+# Local environment that mirrors the AWS deployment:
+#   RDS -> postgres, ElastiCache -> redis, SNS/SQS -> moto, Cognito -> dev-auth,
+#   API Gateway -> gateway, X-Ray -> jaeger, CloudFront+S3 -> web (nginx).
+#
+#   docker compose up --build -d
+#   docker compose up -d --scale booking=3 --scale availability=2   # several tasks per service
+
+x-service: &service
+  build:
+    context: .
+    dockerfile: docker/service.Dockerfile
+  restart: unless-stopped
+  depends_on:
+    postgres: { condition: service_healthy }
+    messaging-init: { condition: service_completed_successfully }
+    dev-auth: { condition: service_started }
+
+x-service-env: &service-env
+  ENVIRONMENT: local
+  LOG_LEVEL: INFO
+  AWS_REGION: ap-southeast-1
+  AWS_ENDPOINT_URL: http://moto:5000
+  AWS_ACCESS_KEY_ID: local
+  AWS_SECRET_ACCESS_KEY: local
+  CONSUMER_WAIT_SECONDS: "1"
+  JWT_ISSUER: http://dev-auth:8000
+  JWKS_URL: http://dev-auth:8000/.well-known/jwks.json
+  OTEL_ENABLED: "true"
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports: ["55432:5432"]
+    volumes:
+      - ./local/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    command: ["postgres", "-c", "max_connections=300"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports: ["56379:6379"]
+
+  moto:
+    image: motoserver/moto:5.0.26
+    ports: ["5000:5000"]
+
+  messaging-init:
+    build: ./local
+    command: ["python", "messaging/bootstrap.py"]
+    environment:
+      AWS_ENDPOINT_URL: http://moto:5000
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+    depends_on: [moto]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    ports: ["16686:16686"]
+
+  dev-auth:
+    build: ./local
+    command: ["uvicorn", "dev-auth.app:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "/local"]
+    environment:
+      DEV_AUTH_ISSUER: http://dev-auth:8000
+      DEV_AUTH_ADMIN_SECRET: local-admin-secret
+      DEV_AUTH_SEED_FILE: /local/dev-auth/users.json
+      DEV_AUTH_STATE_FILE: /home/app/state/users.json
+    volumes:
+      - devauth:/home/app/state
+
+  merchant:
+    <<: *service
+    build: { context: ., dockerfile: docker/service.Dockerfile, args: { SERVICE: merchant } }
+    environment:
+      <<: *service-env
+      SERVICE_NAME: merchant-service
+      DATABASE_URL: postgresql+psycopg://merchant_svc:merchant_local@postgres:5432/merchant
+      PUBLISH_TOPIC_ARN: arn:aws:sns:ap-southeast-1:123456789012:merchant-events
+      IDENTITY_PROVIDER: dev
+      DEV_AUTH_URL: http://dev-auth:8000
+      DEV_AUTH_ADMIN_SECRET: local-admin-secret
+
+  catalogue:
+    <<: *service
+    build: { context: ., dockerfile: docker/service.Dockerfile, args: { SERVICE: catalogue } }
+    environment:
+      <<: *service-env
+      SERVICE_NAME: catalogue-service
+      DATABASE_URL: postgresql+psycopg://catalogue_svc:catalogue_local@postgres:5432/catalogue
+      PUBLISH_TOPIC_ARN: arn:aws:sns:ap-southeast-1:123456789012:catalogue-events
+
+  availability:
+    <<: *service
+    build: { context: ., dockerfile: docker/service.Dockerfile, args: { SERVICE: availability } }
+    environment:
+      <<: *service-env
+      SERVICE_NAME: availability-service
+      DATABASE_URL: postgresql+psycopg://availability_svc:availability_local@postgres:5432/availability
+      CONSUME_QUEUE_URL: http://moto:5000/123456789012/availability-events
+      CONSUMER_CONCURRENCY: "2"
+      REDIS_URL: redis://redis:6379/0
+
+  booking:
+    <<: *service
+    build: { context: ., dockerfile: docker/service.Dockerfile, args: { SERVICE: booking } }
+    environment:
+      <<: *service-env
+      SERVICE_NAME: booking-service
+      DATABASE_URL: postgresql+psycopg://booking_svc:booking_local@postgres:5432/booking
+      PUBLISH_TOPIC_ARN: arn:aws:sns:ap-southeast-1:123456789012:booking-events
+      CONSUME_QUEUE_URL: http://moto:5000/123456789012/booking-slot-events
+      CATALOGUE_URL: http://catalogue:8000
+
+  notification:
+    <<: *service
+    build: { context: ., dockerfile: docker/service.Dockerfile, args: { SERVICE: notification } }
+    environment:
+      <<: *service-env
+      SERVICE_NAME: notification-service
+      DATABASE_URL: postgresql+psycopg://notification_svc:notification_local@postgres:5432/notification
+      CONSUME_QUEUE_URL: http://moto:5000/123456789012/notification-events
+      NOTIFICATION_PROCESSING_DELAY_MS: "0"
+
+  gateway:
+    build: ./local
+    command: ["uvicorn", "gateway.app:app", "--host", "0.0.0.0", "--port", "8080", "--app-dir", "/local", "--no-access-log"]
+    ports: ["8080:8080"]
+    depends_on: [merchant, catalogue, availability, booking, notification, dev-auth]
+
+  web:
+    build:
+      context: ./web
+    ports: ["3000:80"]
+    depends_on: [gateway]
+
+volumes:
+  pgdata:
+  devauth:

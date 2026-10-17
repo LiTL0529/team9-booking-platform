@@ -1,0 +1,7 @@
+{
+  "apiBaseUrl": "",
+  "apiKey": "local-web-key",
+  "authMode": "dev",
+  "cognitoRegion": "",
+  "cognitoClientId": ""
+}

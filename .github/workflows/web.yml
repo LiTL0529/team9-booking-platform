@@ -1,0 +1,64 @@
+name: web-app
+
+on:
+  push:
+    branches: [main]
+    paths: [web/**, .github/workflows/web.yml]
+  pull_request:
+    paths: [web/**, .github/workflows/web.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+defaults:
+  run:
+    working-directory: web
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+      - name: Runtime configuration for this environment
+        env:
+          API_KEY: ${{ secrets.WEB_API_KEY }}
+        run: |
+          cat > dist/config.json <<EOF
+          {"apiBaseUrl": "", "apiKey": "${API_KEY}", "authMode": "cognito",
+           "cognitoRegion": "${{ vars.AWS_REGION || 'ap-southeast-1' }}", "cognitoClientId": "${{ vars.COGNITO_WEB_CLIENT_ID }}"}
+          EOF
+      - name: Upload to S3 and invalidate CloudFront
+        run: |
+          aws s3 sync dist "s3://${{ vars.WEB_BUCKET }}" --delete --cache-control "public,max-age=31536000,immutable" --exclude index.html --exclude config.json
+          aws s3 cp dist/index.html "s3://${{ vars.WEB_BUCKET }}/index.html" --cache-control "no-cache"
+          aws s3 cp dist/config.json "s3://${{ vars.WEB_BUCKET }}/config.json" --cache-control "no-store"
+          aws cloudfront create-invalidation --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" --paths /index.html /config.json

@@ -1,0 +1,4 @@
+# Copy to test.tfvars and adjust.
+region            = "ap-southeast-1"
+github_repository = "your-org/booking-platform"
+alarm_email       = ""

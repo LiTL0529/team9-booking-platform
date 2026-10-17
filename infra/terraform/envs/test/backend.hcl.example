@@ -1,0 +1,6 @@
+# Copy to backend.hcl. Create the bucket and lock table once with scripts/aws_bootstrap_state.sh
+bucket         = "booking-platform-tfstate-<account-id>"
+key            = "envs/test/terraform.tfstate"
+region         = "ap-southeast-1"
+dynamodb_table = "booking-platform-tflock"
+encrypt        = true

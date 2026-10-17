@@ -1,0 +1,32 @@
+name: availability-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/availability/**
+      - libs/platform_common/**
+      - contracts/**
+      - docker/service.Dockerfile
+      - .github/workflows/availability.yml
+      - .github/workflows/_service-pipeline.yml
+  pull_request:
+    paths:
+      - services/availability/**
+      - libs/platform_common/**
+      - contracts/**
+      - docker/service.Dockerfile
+      - .github/workflows/availability.yml
+      - .github/workflows/_service-pipeline.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_service-pipeline.yml
+    with:
+      service: availability
+    secrets: inherit

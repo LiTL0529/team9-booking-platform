@@ -1,0 +1,32 @@
+name: catalogue-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/catalogue/**
+      - libs/platform_common/**
+      - contracts/**
+      - docker/service.Dockerfile
+      - .github/workflows/catalogue.yml
+      - .github/workflows/_service-pipeline.yml
+  pull_request:
+    paths:
+      - services/catalogue/**
+      - libs/platform_common/**
+      - contracts/**
+      - docker/service.Dockerfile
+      - .github/workflows/catalogue.yml
+      - .github/workflows/_service-pipeline.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/_service-pipeline.yml
+    with:
+      service: catalogue
+    secrets: inherit

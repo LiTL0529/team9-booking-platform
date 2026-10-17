@@ -1,0 +1,19 @@
+# Second merchant: joins the platform through configuration only, no service code changes.
+merchant:
+  name: Eastside Sports Hall
+  slug: eastside-sports
+  contact_email: bookings@eastside.test
+members:
+  - username: owner2
+    role: merchant_admin
+resources:
+  - name: Hall Court East
+    resource_type: badminton_court
+  - name: Futsal Pitch
+    resource_type: futsal_pitch
+    description: Five-a-side, artificial turf
+schedule:
+  starts_in_days: 1
+  days: 14
+  start_hour: 9
+  end_hour: 23

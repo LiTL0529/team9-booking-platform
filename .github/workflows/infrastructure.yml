@@ -1,0 +1,67 @@
+name: infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths: [infra/**, .github/workflows/infrastructure.yml]
+  pull_request:
+    paths: [infra/**, .github/workflows/infrastructure.yml]
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply the plan to the test environment
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+defaults:
+  run:
+    working-directory: infra/terraform/envs/test
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - run: terraform fmt -check -recursive ../..
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+      - name: IaC security scan (Checkov)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra/terraform
+          framework: terraform
+          soft_fail: true
+          output_format: cli
+
+  plan:
+    needs: validate
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_INFRA_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+      - name: Init
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=envs/test/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION || 'ap-southeast-1' }}" \
+            -backend-config="dynamodb_table=${{ vars.TF_LOCK_TABLE }}"
+      - run: terraform plan -input=false -out=tfplan -var "github_repository=${{ github.repository }}"
+      - name: Apply (manual trigger only)
+        if: github.event_name == 'workflow_dispatch' && inputs.apply
+        run: terraform apply -input=false tfplan

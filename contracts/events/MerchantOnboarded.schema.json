@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://booking-platform/contracts/events/MerchantOnboarded.schema.json",
+  "title": "MerchantOnboarded",
+  "description": "Published by the Merchant Service when a merchant joins the platform.",
+  "type": "object",
+  "properties": {
+    "merchant_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f-]{36}$"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slug": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contact_email": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "required": [
+    "merchant_id",
+    "name",
+    "slug",
+    "contact_email"
+  ],
+  "additionalProperties": false
+}

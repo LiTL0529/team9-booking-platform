@@ -1,0 +1,9 @@
+{
+  "admin": {"password": "Passw0rd!", "groups": ["platform_admin"], "email": "admin@platform.test"},
+  "alice": {"password": "Passw0rd!", "groups": ["customer"], "email": "alice@example.test"},
+  "bob": {"password": "Passw0rd!", "groups": ["customer"], "email": "bob@example.test"},
+  "owner1": {"password": "Passw0rd!", "groups": ["customer"], "email": "owner1@citycourts.test"},
+  "owner2": {"password": "Passw0rd!", "groups": ["customer"], "email": "owner2@eastside.test"},
+  "partner": {"password": "Passw0rd!", "groups": ["customer"], "email": "integration@partner.test"},
+  "loadtester": {"password": "Passw0rd!", "groups": ["customer"], "email": "load@platform.test"}
+}
