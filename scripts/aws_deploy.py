@@ -270,15 +270,28 @@ def step_env(_args) -> None:
 
 
 def step_scale(args) -> None:
+    if args.tasks < 0:
+        raise ValueError('Task count cannot be negative')
     out = tf_outputs()
     ecs, aas = session().client("ecs"), session().client("application-autoscaling")
+    targets = {t['ResourceId'].split('/')[-1]: t for t in aas.describe_scalable_targets(
+        ServiceNamespace='ecs')['ScalableTargets'] if t['ResourceId'].startswith(f"service/{out['ecs_cluster']}/")}
+    saved_path = REPO / '.local' / 'scaling-limits.json'
+    saved = json.loads(saved_path.read_text(encoding='utf-8')) if saved_path.is_file() else {}
+    previous = saved.get('max_tasks', {}) if saved.get('cluster') == out['ecs_cluster'] else {}
+    defaults = {'availability': 6, 'booking': 5, 'notification': 5}
+    limits = {name: targets.get(name, {}).get('MaxCapacity') or previous.get(name) or defaults.get(name, 2)
+              for name in SERVICES}
+    if args.tasks == 0:
+        # Parking at max=0 otherwise loses tuned limits when the environment resumes.
+        saved_path.parent.mkdir(parents=True, exist_ok=True)
+        saved_path.write_text(json.dumps({'cluster': out['ecs_cluster'], 'max_tasks': limits}, indent=2), encoding='utf-8')
     for s in SERVICES:
         resource = f"service/{out['ecs_cluster']}/{s}"
         if args.tasks == 0:
             aas.register_scalable_target(ServiceNamespace="ecs", ResourceId=resource,
                                          ScalableDimension="ecs:service:DesiredCount", MinCapacity=0, MaxCapacity=0)
         else:
-            limits = {"availability": 6, "booking": 5, "notification": 5}  # keep in sync with service_scaling
             aas.register_scalable_target(ServiceNamespace="ecs", ResourceId=resource,
                                          ScalableDimension="ecs:service:DesiredCount",
                                          MinCapacity=args.tasks, MaxCapacity=max(args.tasks, limits.get(s, 2)))
