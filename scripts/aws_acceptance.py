@@ -182,25 +182,28 @@ class Acceptance:
         app['command'] = ['python', '-c', 'raise SystemExit(42)']
         bad = self.ecs.register_task_definition(**body)['taskDefinition']['taskDefinitionArn']
         self.record('failed_revision_started', original=previous, failed_revision=bad)
-        started = datetime.now(UTC)
-        self.ecs.update_service(cluster=CLUSTER, service='merchant', taskDefinition=bad)
-        observed_failure = False
-        observed_bad = False
+        updated = self.ecs.update_service(cluster=CLUSTER, service='merchant', taskDefinition=bad)['service']
+        deployment_id = next(d['id'].split('/')[-1] for d in updated['deployments'] if d['status'] == 'PRIMARY')
         try:
+            def history_arn():
+                rows = self.ecs.list_service_deployments(cluster=CLUSTER, service='merchant')['serviceDeployments']
+                return next((v['serviceDeploymentArn'] for v in rows
+                             if v['targetServiceRevisionArn'].endswith('/' + deployment_id)), None)
+            deployment_arn = until(history_arn, 'Deployment history did not appear', timeout=60, interval=5)
+
             def rolled_back():
-                nonlocal observed_failure, observed_bad
                 current = next(x for x in self.services() if x['serviceName'] == 'merchant')
-                observed_bad = observed_bad or any(d['taskDefinition'] == bad for d in current['deployments'])
-                if any(d.get('rolloutState') == 'FAILED' and d['taskDefinition'] == bad for d in current['deployments']):
-                    observed_failure = True
-                reasons = [v['message'] for v in current['events'] if v['createdAt'] >= started]
-                if any('rollback' in v.lower() or 'circuit breaker' in v.lower() for v in reasons):
-                    observed_failure = True
-                return current if (observed_bad and observed_failure and current['taskDefinition'] == previous
+                history = self.ecs.describe_service_deployments(
+                    serviceDeploymentArns=[deployment_arn])['serviceDeployments'][0]
+                return (current, history) if (history['status'] == 'ROLLBACK_SUCCESSFUL'
+                                   and current['taskDefinition'] == previous
                                    and len(current['deployments']) == 1
-                                   and current['deployments'][0].get('rolloutState') == 'COMPLETED') else None
-            value = until(rolled_back, 'Automatic rollback did not complete', timeout=900)
+                                   and current['deployments'][0].get('rolloutState') == 'COMPLETED'
+                                   and current['runningCount'] == current['desiredCount']
+                                   and current['pendingCount'] == 0) else None
+            value, history = until(rolled_back, 'Automatic rollback did not complete', timeout=1800)
             self.record('automatic_startup_failure_rollback', passed=True, restored=previous,
+                        deployment_history=history,
                         events=[v['message'] for v in value['events'][:10]])
         finally:
             current = next(x for x in self.services() if x['serviceName'] == 'merchant')
