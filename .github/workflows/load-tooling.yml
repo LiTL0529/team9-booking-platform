@@ -2,9 +2,9 @@ name: acceptance-tooling
 
 on:
   push:
-    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, tests/operations/**, tests/e2e/**, scripts/aws_acceptance.py, scripts/wait_ecs_deployment.py, .github/workflows/load-tooling.yml]
+    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, tests/operations/**, tests/e2e/**, tests/concurrency/**, scripts/aws_acceptance.py, scripts/aws_backlog_acceptance.py, scripts/aws_release_acceptance.py, scripts/aws_queue_acceptance.py, scripts/wait_ecs_deployment.py, .github/workflows/load-tooling.yml]
   pull_request:
-    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, tests/operations/**, tests/e2e/**, scripts/aws_acceptance.py, scripts/wait_ecs_deployment.py, .github/workflows/load-tooling.yml]
+    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, tests/operations/**, tests/e2e/**, tests/concurrency/**, scripts/aws_acceptance.py, scripts/aws_backlog_acceptance.py, scripts/aws_release_acceptance.py, scripts/aws_queue_acceptance.py, scripts/wait_ecs_deployment.py, .github/workflows/load-tooling.yml]
   workflow_dispatch:
 
 permissions:
@@ -18,7 +18,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install pytest==9.0.3 boto3==1.35.90 httpx==0.28.1 pyyaml==6.0.2
+      - run: pip install pytest==9.0.3 boto3==1.35.90 httpx==0.28.1 pyyaml==6.0.2 ruff==0.8.6
+      - name: Check cloud drill scripts
+        run: ruff check scripts/aws_backlog_acceptance.py scripts/aws_release_acceptance.py scripts/aws_queue_acceptance.py
       - name: Inventory and evidence regression checks
         run: python -m pytest -q tests/load/test_tooling.py tests/operations
       - name: Install the pinned k6 release
