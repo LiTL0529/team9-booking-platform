@@ -16,6 +16,8 @@ API. The first business scenario is sports facility booking.
 
 ## Repository layout
 
+The deployed site includes [API documentation](docs/api-documentation.md) at `/api-docs.html`, with versioned specifications served through the gateway.
+
 ```
 libs/platform_common/   Shared service template: token checks, logging, tracing, health checks,
                         DB access + migrations, transactional outbox, idempotent SQS consumers,
@@ -109,12 +111,15 @@ PostgreSQL on `localhost:55432` (started by either local option) or `TEST_PG_URL
 | Check | Command |
 |---|---|
 | 100 concurrent bookings of one slot | `python tests/concurrency/same_slot.py --requests 100` |
-| Stepped load 25→200 rps, 80/20 mix | `k6 run tests/load/k6-search-and-book.js` or `python tests/load/loadgen.py` |
+| Corrected stepped HTTP load, 80/20 mix | `python scripts/aws_loadtest.py --profile full --days 6` (requires at least 55,500 free slots) |
+| Short cloud rehearsal | `python scripts/aws_loadtest.py --profile short --days 2` (requires 4,950 free slots) |
+| Load-tool regression checks | `python -m pytest -q tests/load/test_tooling.py` |
 | 5,000-event backlog | `python tests/load/event_backlog.py --events 5000` |
 | Partner integration | `python partner-client/partner_client.py book --type futsal_pitch` |
 | Seed 100 merchants / 1,000 resources / 20,000 slots | `python scripts/seed_load_data.py` |
 
 See [docs/testing.md](docs/testing.md) for what each test proves and the results recorded so far.
+See [docs/acceptance-status.md](docs/acceptance-status.md) for implemented features, verified evidence and remaining proposal acceptance. Historical whole-run load summaries do not establish peak-stage successful-booking targets.
 
 ## Deploy to AWS
 

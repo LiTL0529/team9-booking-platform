@@ -1,0 +1,29 @@
+name: load-tooling
+
+on:
+  push:
+    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, .github/workflows/load-tooling.yml]
+  pull_request:
+    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, .github/workflows/load-tooling.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pytest==9.0.3 boto3==1.35.90
+      - name: Inventory and evidence regression checks
+        run: python -m pytest -q tests/load/test_tooling.py
+      - name: Install the pinned k6 release
+        run: |
+          curl -fsSL https://github.com/grafana/k6/releases/download/v0.55.0/k6-v0.55.0-linux-amd64.tar.gz | tar xz
+          echo "$PWD/k6-v0.55.0-linux-amd64" >> "$GITHUB_PATH"
+      - name: Verify actual k6 requests against a local controlled server
+        run: python tests/load/verify_k6.py
