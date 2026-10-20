@@ -55,6 +55,23 @@ def metric(summary: dict, name: str, field: str, default=None):
     return item.get('values', item).get(field, default)
 
 
+def scaling_snapshot(session):
+    client = session.client('application-autoscaling')
+    rows = {}
+    for target in client.describe_scalable_targets(ServiceNamespace='ecs')['ScalableTargets']:
+        if target['ResourceId'].startswith('service/booking-test/'):
+            rows[target['ResourceId'].split('/')[-1]] = {
+                'min': target['MinCapacity'], 'max': target['MaxCapacity'],
+                'suspended': target.get('SuspendedState', {})}
+    for policy in client.describe_scaling_policies(ServiceNamespace='ecs')['ScalingPolicies']:
+        config = policy.get('TargetTrackingScalingPolicyConfiguration', {})
+        if (policy['ResourceId'].startswith('service/booking-test/') and
+                config.get('PredefinedMetricSpecification', {}).get('PredefinedMetricType') ==
+                'ECSServiceAverageCPUUtilization'):
+            rows.setdefault(policy['ResourceId'].split('/')[-1], {})['cpu_target_percent'] = config['TargetValue']
+    return rows
+
+
 def parse_summary(log_text: str) -> dict:
     """Ignore CodeBuild's echoed shell blocks and select actual JSON output."""
     for segment in reversed(log_text.split('K6_SUMMARY_BEGIN')[1:]):
@@ -130,6 +147,7 @@ def main() -> None:
         return env(name, base64.b64encode((REPO / path).read_bytes()).decode())
 
     cb, ecs, logs = session.client('codebuild'), session.client('ecs'), session.client('logs')
+    scaling_start = scaling_snapshot(session)
     source_paths = [Path(__file__), REPO / 'tests/load/k6-search-and-book.js',
                     REPO / 'scripts/prepare_load_test.py', args.profiles_file]
     fingerprints = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in source_paths}
@@ -140,7 +158,7 @@ def main() -> None:
         revision = None
     build = cb.start_build(
         projectName='booking-test-images', buildspecOverride=BUILDSPEC, timeoutInMinutesOverride=60,
-        computeTypeOverride='BUILD_GENERAL1_MEDIUM',
+        computeTypeOverride='BUILD_GENERAL1_LARGE',
         environmentVariablesOverride=[
             source('K6_SCRIPT_B64', 'tests/load/k6-search-and-book.js'),
             source('PREPARE_SCRIPT_B64', 'scripts/prepare_load_test.py'),
@@ -191,7 +209,8 @@ def main() -> None:
               'generator_revision': revision,
               'generator_sha256': fingerprints,
               'environment': {'task_definitions_start': revisions_start, 'task_definitions_end': revisions_end,
-                              'deployment_observed_during_build': deployment_observed},
+                              'deployment_observed_during_build': deployment_observed,
+                              'scaling_at_dispatch': scaling_start},
               'timeline': timeline, 'timeline_origin': 'CodeBuild dispatch; includes preparation time'}
     out = REPO / '.local' / f"loadtest-v2-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
     out.parent.mkdir(exist_ok=True)

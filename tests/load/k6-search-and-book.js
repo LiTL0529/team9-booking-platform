@@ -37,9 +37,9 @@ for (const phase of phases) {
     scenarios[`${phase.name}_${op}`] = {
       executor: 'constant-arrival-rate', exec: op, rate, timeUnit: '1s',
       startTime: `${phase.start_seconds}s`, duration: `${phase.seconds}s`, gracefulStop: '30s',
-      // Allocate enough workers for one second of in-flight requests before
-      // the phase starts; growing workers during a step can drop arrivals.
-      preAllocatedVUs: Math.max(2, rate), maxVUs: Math.max(20, rate * 3),
+      // Budget eight seconds of in-flight requests before each phase starts;
+      // the first full run saw multi-second ramp responses and dropped arrivals.
+      preAllocatedVUs: Math.max(20, rate * 8), maxVUs: Math.max(30, rate * 12),
       tags: { phase: phase.name, op },
     };
   }
@@ -50,6 +50,13 @@ for (const phase of phases) {
     thresholds[`successful_booking_latency{phase:${phase.name}}`] = ['p(95)<1000'];
     thresholds[`unexpected_errors{phase:${phase.name}}`] = ['rate<0.01'];
     thresholds[`unexpected_responses{phase:${phase.name}}`] = ['rate<0.01'];
+  } else {
+    // k6 exports tag-specific trends only when they have a submetric selector.
+    // These selectors report the ramp values without imposing peak SLOs there.
+    thresholds[`search_latency{phase:${phase.name}}`] = ['p(95)>=0'];
+    thresholds[`successful_booking_latency{phase:${phase.name}}`] = ['p(95)>=0'];
+    thresholds[`unexpected_errors{phase:${phase.name}}`] = ['rate>=0'];
+    thresholds[`unexpected_responses{phase:${phase.name}}`] = ['rate>=0'];
   }
   thresholds[`search_requests{phase:${phase.name}}`] = [`count>=${Math.floor(phase.expected_searches * 0.98)}`];
   thresholds[`booking_requests{phase:${phase.name}}`] = [`count>=${Math.floor(phase.expected_bookings * 0.98)}`];
