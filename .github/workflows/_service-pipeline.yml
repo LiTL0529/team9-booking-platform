@@ -16,7 +16,9 @@ permissions:
 env:
   SERVICE: ${{ inputs.service }}
   AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
-  IMAGE_TAG: ${{ github.sha }}
+  # A rerun rebuilds the same source, but base layers and build metadata can
+  # change. Give each attempt its own immutable tag; retain the source SHA.
+  IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   test:
@@ -46,6 +48,8 @@ jobs:
       - name: Shared template tests
         working-directory: libs/platform_common
         run: pytest -q
+      - name: Deployment verification regression checks
+        run: pytest -q tests/operations
       - name: Service tests (unit, database integration, OpenAPI and event contract tests)
         working-directory: services/${{ inputs.service }}
         run: pytest -q --junitxml=../../test-results-${{ inputs.service }}.xml
@@ -96,7 +100,7 @@ jobs:
       - name: Scan image (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0 (pinned by commit: release tags have been re-pointed before)
         with:
-          image-ref: ${{ inputs.service }}:${{ github.sha }}
+          image-ref: ${{ inputs.service }}:${{ env.IMAGE_TAG }}
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
@@ -130,13 +134,15 @@ jobs:
       id-token: write
     concurrency: deploy-${{ inputs.service }}
     steps:
+      - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - name: Current task definition
         run: |
-          aws ecs describe-task-definition --task-definition ${{ vars.ENVIRONMENT || 'test' }}-$SERVICE \
+          CURRENT=$(aws ecs describe-services --cluster '${{ vars.ECS_CLUSTER }}' --services "$SERVICE" --query 'services[0].taskDefinition' --output text)
+          aws ecs describe-task-definition --task-definition "$CURRENT" \
             --query taskDefinition > task-definition.json
       - name: New revision with the new image
         id: render
@@ -147,20 +153,20 @@ jobs:
           image: ${{ needs.build.outputs.image }}
           environment-variables: SERVICE_VERSION=${{ github.sha }}
       - name: Rolling deployment (circuit breaker rolls back on failure)
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render.outputs.task-definition }}
-          cluster: ${{ vars.ECS_CLUSTER }}
-          service: ${{ inputs.service }}
-          wait-for-service-stability: true
-          wait-for-minutes: 15
+        env:
+          TASK_FILE: ${{ steps.render.outputs.task-definition }}
+          ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+        run: |
+          jq 'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy,.deregisteredAt)' "$TASK_FILE" > register.json
+          TASK_ARN=$(aws ecs register-task-definition --cli-input-json file://register.json --query taskDefinition.taskDefinitionArn --output text)
+          aws ecs update-service --cluster "$ECS_CLUSTER" --service "$SERVICE" --task-definition "$TASK_ARN" > /dev/null
+          python scripts/wait_ecs_deployment.py --cluster "$ECS_CLUSTER" --service "$SERVICE" --task-definition "$TASK_ARN" --timeout 900
 
   verify:
     name: smoke test and DAST
     needs: deploy
-    # The test environment is parked at 0 tasks between demos; set the repository variable
-    # RUN_SMOKE_TESTS=true while it is running (python scripts/aws_deploy.py scale --tasks 2).
-    if: vars.RUN_SMOKE_TESTS == 'true'
+    # Every successful deployment must execute verification. Parked environments
+    # fail the deployment check instead of reporting a verified empty service.
     runs-on: ubuntu-latest
     environment: test
     steps:
@@ -186,3 +192,51 @@ jobs:
           rules_file_name: .zap/rules.tsv
           allow_issue_writing: false
           fail_action: false
+      - name: OWASP ZAP baseline against a deployed API
+        env:
+          PLATFORM_GATEWAY: ${{ vars.WEB_URL }}
+          ZAP_AUTH_HEADER: x-api-key
+          ZAP_AUTH_HEADER_VALUE: ${{ secrets.SMOKE_API_KEY }}
+        run: |
+          python - <<'PY'
+          import os
+          from urllib.request import Request, urlopen
+          url = os.environ['PLATFORM_GATEWAY'].rstrip('/') + '/v1/availability/resource-types'
+          with urlopen(Request(url, headers={'x-api-key': os.environ['ZAP_AUTH_HEADER_VALUE']}), timeout=20) as response:
+              if response.status != 200:
+                  raise RuntimeError('API scan preflight did not reach the application')
+          print('API scan preflight reached the application: HTTP 200')
+          PY
+          export ZAP_AUTH_HEADER_SITE=$(python -c 'import os; from urllib.parse import urlparse; print(urlparse(os.environ["PLATFORM_GATEWAY"]).hostname)')
+          mkdir -p zap-api-report
+          cp .zap/rules.tsv zap-api-report/rules.tsv
+          chmod 777 zap-api-report
+          set +e
+          docker run --rm -v "$PWD/zap-api-report:/zap/wrk:rw" \
+            -e ZAP_AUTH_HEADER -e ZAP_AUTH_HEADER_VALUE -e ZAP_AUTH_HEADER_SITE \
+            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+            -t "${PLATFORM_GATEWAY%/}/v1/availability/resource-types" \
+            -c rules.tsv -m 1 -J zap-api.json -r zap-api.html -I
+          SCAN_EXIT=$?
+          set -e
+          sudo chown -R "$(id -u):$(id -g)" zap-api-report
+          # The published report must never retain an application credential.
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          key = os.environ['ZAP_AUTH_HEADER_VALUE']
+          if not key or not Path('zap-api-report/zap-api.json').is_file():
+              raise RuntimeError('API scan produced no JSON report or credential was missing')
+          safe = Path('zap-api-sanitized')
+          safe.mkdir()
+          for path in Path('zap-api-report').glob('zap-api.*'):
+              value = path.read_text(encoding='utf-8')
+              (safe / path.name).write_text(value.replace(key, '[REDACTED]'), encoding='utf-8')
+          PY
+          exit "$SCAN_EXIT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zap-api-${{ inputs.service }}
+          path: zap-api-sanitized/zap-api.*
+          if-no-files-found: ignore

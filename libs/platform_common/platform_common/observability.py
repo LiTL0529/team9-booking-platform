@@ -54,6 +54,20 @@ def configure_logging(service_name: str, level: str = "INFO") -> None:
 _tracing_configured = False
 
 
+def configure_aws_propagation() -> None:
+    """Continue API Gateway's X-Ray parent, retaining W3C context for local clients."""
+    from opentelemetry.baggage.propagation import W3CBaggagePropagator
+    from opentelemetry.propagate import set_global_textmap
+    from opentelemetry.propagators.aws import AwsXRayPropagator
+    from opentelemetry.propagators.composite import CompositePropagator
+    from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+    # The gateway's X-Ray context is authoritative when both formats arrive.
+    set_global_textmap(CompositePropagator([
+        TraceContextTextMapPropagator(), W3CBaggagePropagator(), AwsXRayPropagator(),
+    ]))
+
+
 def configure_tracing(app, settings, engine) -> None:
     global _tracing_configured
     if not settings.otel_enabled or _tracing_configured:
@@ -70,6 +84,7 @@ def configure_tracing(app, settings, engine) -> None:
     if settings.otel_id_generator == "xray":
         from opentelemetry.sdk.extension.aws.trace import AwsXRayIdGenerator
 
+        configure_aws_propagation()
         kwargs["id_generator"] = AwsXRayIdGenerator()
     provider = TracerProvider(
         resource=Resource.create(

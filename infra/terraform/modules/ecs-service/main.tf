@@ -10,6 +10,8 @@ locals {
     OTEL_ENABLED                = "true"
     OTEL_EXPORTER_OTLP_ENDPOINT = "http://127.0.0.1:4318"
     OTEL_ID_GENERATOR           = "xray"
+    OTEL_TRACES_SAMPLER         = "parentbased_traceidratio"
+    OTEL_TRACES_SAMPLER_ARG     = "0.1"
   }) : { name = k, value = v }]
   container_secrets = [for k, v in var.secrets : { name = k, valueFrom = v }]
 }
@@ -149,18 +151,21 @@ resource "aws_ecs_task_definition" "this" {
 
   container_definitions = jsonencode([
     {
-      name         = "app"
+      name = "app"
+      # Reserve most of this small task for the business process. A zero CPU
+      # reservation gives it only two shares when sidecars compete for CPU.
+      cpu          = max(2, var.cpu - 64)
       image        = var.image
       essential    = true
       portMappings = [{ name = "http", containerPort = 8000, protocol = "tcp" }]
       environment  = local.container_env
       secrets      = local.container_secrets
       healthCheck = {
-        command     = ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health/live',timeout=2)\""]
-        interval    = 10
-        timeout     = 3
+        command     = ["CMD-SHELL", "python -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health/live',timeout=3)\""]
+        interval    = 30
+        timeout     = 5
         retries     = 3
-        startPeriod = 20
+        startPeriod = 60
       }
       logConfiguration = {
         logDriver = "awslogs"
@@ -178,7 +183,7 @@ resource "aws_ecs_task_definition" "this" {
       essential = false
       command   = ["--config=/etc/ecs/ecs-default-config.yaml"]
       cpu       = 32
-      memory    = 64
+      memory    = 96
       logConfiguration = {
         logDriver = "awslogs"
         options = {

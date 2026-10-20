@@ -126,6 +126,7 @@ module "service" {
   image                         = "${aws_ecr_repository.service[each.key].repository_url}:${var.image_tag}"
   min_tasks                     = var.service_scaling[each.key].min
   max_tasks                     = var.service_scaling[each.key].max
+  cpu_target_percent            = each.key == "availability" ? 35 : 50
   nlb_arn                       = aws_lb.internal.arn
   nlb_listener_port             = each.value.port
   attach_to_nlb                 = true

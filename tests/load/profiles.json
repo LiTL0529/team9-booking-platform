@@ -1,0 +1,15 @@
+{
+  "full": [
+    {"name": "r25", "rate": 25, "seconds": 300},
+    {"name": "r50", "rate": 50, "seconds": 300},
+    {"name": "r100", "rate": 100, "seconds": 300},
+    {"name": "r150", "rate": 150, "seconds": 300},
+    {"name": "r200", "rate": 200, "seconds": 300},
+    {"name": "peak200", "rate": 200, "seconds": 600}
+  ],
+  "short": [
+    {"name": "r25", "rate": 25, "seconds": 30},
+    {"name": "r100", "rate": 100, "seconds": 60},
+    {"name": "peak200", "rate": 200, "seconds": 90}
+  ]
+}

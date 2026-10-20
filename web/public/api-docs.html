@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CourtHub API documentation</title><style>
+body{font:16px/1.6 system-ui,sans-serif;color:#183c34;background:#f3f7f5;margin:0}main{max-width:1050px;margin:45px auto;padding:24px}a{color:#0b6955}header{margin-bottom:28px}select,button{font:inherit;padding:9px 14px;margin:0 10px 12px 0}article{background:white;border:1px solid #d6e3dd;padding:20px;margin:14px 0;border-radius:8px}code{overflow-wrap:anywhere}small{color:#536e65}.method{font-weight:bold;color:#0b6955}#error{color:#a22}h2{margin-top:0}
+</style></head><body><main><header><a href="/">CourtHub</a><h1>Platform API documentation</h1>
+<p>One versioned API for venue operators, customers and partner applications.</p>
+<p>Use your application's <code>x-api-key</code> header. Private operations also require <code>Authorization: Bearer &lt;ID token&gt;</code>. Each service enforces user roles and ownership.</p></header>
+<label for="service">Service </label><select id="service"><option>merchant</option><option>catalogue</option><option>availability</option><option>booking</option><option>notification</option></select><button id="download">Download OpenAPI JSON</button>
+<p id="status" role="status">Loading specification…</p><p id="error" role="alert"></p><section id="routes"></section>
+<small>Fixed hourly sports bookings. HTTP 409 indicates a booking conflict. Use an Idempotency-Key for booking retries. See the downloaded OpenAPI specification for schemas, parameters and response details.</small>
+</main><script>
+let spec;
+async function load(){
+ const service=document.querySelector('#service').value;
+ const path='/v1/docs/'+service+'/openapi.json';
+ document.querySelector('#error').textContent='';document.querySelector('#routes').replaceChildren();
+ document.querySelector('#status').textContent='Loading '+service+'…';spec=null;
+ try{
+  const config=await(await fetch('/config.json')).json();
+  const response=await fetch(path,{headers:{'x-api-key':config.apiKey}});
+  if(!response.ok)throw Error('Specification request returned HTTP '+response.status);
+  spec=await response.json();document.querySelector('#status').textContent=spec.info.title+' — '+path;
+  for(const [route,methods] of Object.entries(spec.paths))for(const [method,operation] of Object.entries(methods)){
+   if(!['get','post','put','patch','delete','head','options'].includes(method))continue;
+   const card=document.createElement('article'),title=document.createElement('h2'),description=document.createElement('p'),responses=document.createElement('small');
+   title.textContent=method.toUpperCase()+' '+route;description.textContent=operation.summary||operation.description||'';
+   responses.textContent='Responses: '+Object.keys(operation.responses||{}).join(', ');
+   card.append(title,description,responses);document.querySelector('#routes').append(card);
+  }
+ }catch(error){document.querySelector('#status').textContent='';document.querySelector('#error').textContent=error.message;}
+}
+document.querySelector('#service').addEventListener('change',load);
+document.querySelector('#download').addEventListener('click',()=>{if(!spec)return;const url=URL.createObjectURL(new Blob([JSON.stringify(spec,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=document.querySelector('#service').value+'-v1-openapi.json';a.click();URL.revokeObjectURL(url);});load();
+</script></body></html>

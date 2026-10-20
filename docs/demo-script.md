@@ -1,20 +1,20 @@
-# Demo script (8 + 2 minutes)
+# Demo script
 
-Follows section 6 of the presentation guidelines. Prepare beforehand: AWS environment up, data
-seeded, k6 installed, the CloudWatch dashboard and X-Ray open in browser tabs, two terminals.
+Use the revised 20-slide Integrated deck and speaker guide in the workspace `output/答辩修订版` folder. The customer flow and commands are detailed in the workspace `答辩当天演示操作单.md`.
 
-| Time | Show | Commands / clicks | Point to make |
-|---|---|---|---|
-| 0:00 | Customer workflow | Web app → search across venues → book → My bookings → Inbox | One app over all merchants; notification arrives asynchronously |
-| 1:30 | Merchant view | Sign in as `owner1` → resources, publish slots, bookings | Merchants see only their own data (token claim + server checks) |
-| 2:30 | Platform reuse | `python scripts/onboard_merchant.py merchants/eastside-sports.yaml`, then the new venue appears in search | New merchant by configuration, no code change |
-| 3:15 | Partner client | `python partner-client/partner_client.py book --type futsal_pitch` | Separate API key/usage plan, reuses booking rules, login, storage, notifications |
-| 4:00 | Correctness | `python tests/concurrency/same_slot.py --requests 100` | Exactly one 201 across several Booking tasks |
-| 4:45 | Scalability | Start `k6 run -e PROFILE=short ...`; dashboard: Availability task count rises, Merchant/Catalogue stay at 2 | Each service scales on its own load |
-| 6:00 | Resilience | `aws ecs update-service ... notification --desired-count 0`, book in the web app, scale back to 2, inbox fills | Event-driven decoupling, queued events processed once |
-| 6:45 | Tracing | X-Ray trace of one booking through gateway → Booking → Notification | OpenTelemetry in the template |
-| 7:15 | DevOps | Push a one-line change to one service; show only that workflow running; ECS rolling update while k6 runs | Independent pipelines, zero-downtime deploy, auto rollback |
+## Core demonstration 8 minutes
 
-Fallback if the cloud is unavailable: run the same steps on the local stack
-(`docker compose up` or `scripts/dev_native.py up`) — everything except auto scaling and X-Ray
-(Jaeger at http://localhost:16686 instead).
+| Time | Action | Evidence and explanation |
+| --- | --- | --- |
+| 0:00–1:20 | Alice searches 25 October, books City Courts, opens My bookings and Inbox | Same booking reference; asynchronous notification |
+| 1:20–2:40 | Owner1 shows the reservation in an independent session; inspect and run Northpoint YAML | Merchant-scoped view; reusable onboarding. Northpoint has no members entry, so do not claim owner assignment |
+| 2:40–4:00 | Partner books 26 October; 100-request race uses 27 October | Independent key plus token; actual success/conflict counts and task distribution |
+| 4:00–5:20 | Monitoring and labelled historical scaling evidence | Running task samples, configured limits and account quota are different facts |
+| 5:20–6:00 | Open successful Booking workflow 39050921193 or a newer verified run | Show executed jobs, not just workflow configuration |
+| 6:00–8:00 | Explain measured results and open acceptance | Historical whole-run values do not prove peak-stage success-only acceptance |
+
+Use prepared load evidence in the core demonstration. Do not run load concurrently with deployment. The 20 October short rehearsal failed thresholds and overlapped pipeline retries. Prepare at least 4,950 distinct free slots on dedicated dates. The 29–30 October dates correspond to `--start-day 5` on 24 October and `--start-day 9` on 20 October. Check remaining inventory before every repetition.
+
+Notification outage, X-Ray tracing and a new deployment are optional follow-ups after rehearsal, not required in the core sequence. If the cloud stalls, play a labelled local recording. A local fallback stack is useful only if already running and rehearsed.
+
+Actual effort, responsibilities and speaking assignments remain pending team confirmation. Follow [acceptance status](acceptance-status.md); do not present pending tests as complete.
