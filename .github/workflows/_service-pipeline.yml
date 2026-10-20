@@ -16,7 +16,9 @@ permissions:
 env:
   SERVICE: ${{ inputs.service }}
   AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
-  IMAGE_TAG: ${{ github.sha }}
+  # A rerun rebuilds the same source, but base layers and build metadata can
+  # change. Give each attempt its own immutable tag; retain the source SHA.
+  IMAGE_TAG: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
   test:
@@ -98,7 +100,7 @@ jobs:
       - name: Scan image (Trivy)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0 (pinned by commit: release tags have been re-pointed before)
         with:
-          image-ref: ${{ inputs.service }}:${{ github.sha }}
+          image-ref: ${{ inputs.service }}:${{ env.IMAGE_TAG }}
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
