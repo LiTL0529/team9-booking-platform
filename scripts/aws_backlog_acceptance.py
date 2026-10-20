@@ -25,6 +25,11 @@ from prepare_load_test import prepare
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def queue_scaled_while_busy(activities, timeline):
+    return (any('sqs-backlog' in str(v.get('Cause', '')) for v in activities)
+            and any(v['running'] > 2 and v['visible'] + v['in_flight'] > 0 for v in timeline))
+
+
 def notification_count(checks, task_definition, customer_id):
     """Read only the synthetic customer's own inbox count using the existing task role."""
     query = (
@@ -102,6 +107,13 @@ def main():
     api = Api(cfg, login(cfg, "loadtester", os.environ["LOAD_PASSWORD"]))
     _, slots = prepare(cfg.gateway, cfg.api_key, [{"name": "probes", "rate": 5, "seconds": 2000}], args.days, args.start_day)
     original = a.original["notification"]["taskDefinition"]
+    definition = a.ecs.describe_task_definition(taskDefinition=original)["taskDefinition"]
+    app = next(c for c in definition["containerDefinitions"] if c["name"] == "app")
+    settings = {v["name"]: v["value"] for v in app.get("environment", [])}
+    require(
+        int(settings.get("NOTIFICATION_PROCESSING_DELAY_MS", "0")) == 0,
+        "The original notification revision must use normal processing",
+    )
     temporary = None
     stop = threading.Event()
     rows = []
@@ -111,6 +123,7 @@ def main():
         while not stop.is_set() and state["index"] < len(slots):
             index = state["index"]
             state["index"] += 1
+            phase = state["phase"]
             started = time.perf_counter()
             status = 0
             error = None
@@ -118,7 +131,7 @@ def main():
                 status = api.book(slots[index]).status_code
             except Exception as exc:  # noqa: BLE001 - preserve network failures as failed probes
                 error = type(exc).__name__
-            rows.append({"phase": state["phase"], "status": status, "error": error, "ms": (time.perf_counter() - started) * 1000})
+            rows.append({"phase": phase, "status": status, "error": error, "ms": (time.perf_counter() - started) * 1000})
             stop.wait(max(0, 0.5 - (time.perf_counter() - started)))
 
     def p95(values):
@@ -145,8 +158,8 @@ def main():
         a.record(
             "test_configuration",
             processing_delay_ms=args.processing_delay_ms,
-            consumer_concurrency=2,
-            task_vcpu=0.25,
+            consumer_concurrency=int(settings.get("CONSUMER_CONCURRENCY", "1")),
+            task_vcpu=int(definition["cpu"]) / 1024,
             synthetic_events=5000,
             booking_probe_rate=2,
             description=(
@@ -228,7 +241,7 @@ def main():
             }
             for p, v in groups.items()
         }
-        scale = any("sqs-backlog" in str(v["Cause"]) for v in activity) and max(v["desired"] for v in timeline) > 2
+        scale = queue_scaled_while_busy(activity, timeline)
         # Verify persisted output, rather than treating approximate queue emptiness as delivery proof.
         persisted = notification_count(a, original, "backlog-" + run)
         passed = (
