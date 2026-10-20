@@ -9,6 +9,7 @@ search -> book -> conflict for a second customer -> notification -> cancel -> sl
 from __future__ import annotations
 
 import os
+import random
 import sys
 import time
 import uuid
@@ -33,6 +34,25 @@ def eventually(fn, what: str, timeout: float = 30):
     raise AssertionError(f"timed out waiting for {what}")
 
 
+def reserve_slot(public, customer, first: int):
+    """Concurrent pipelines can race on a search snapshot; retry only a real 409."""
+    conflicts = 0
+    for offset in range(first, first + 14):
+        day = (date.today() + timedelta(days=offset)).isoformat()
+        slots = public.call("GET", "/v1/availability/slots", params={"date": day}).json()["slots"]
+        random.SystemRandom().shuffle(slots)
+        for slot in slots[:10]:
+            key = str(uuid.uuid4())
+            booking = customer.book(slot["slot_id"], key)
+            if booking.status_code == 409:
+                conflicts += 1
+                continue
+            assert booking.status_code == 201, booking.text
+            print(f"1. reserved a slot on {day}; concurrent conflicts retried: {conflicts}")
+            return day, slot, key, booking
+    raise AssertionError(f"No reservable slot in 14 days; conflicts={conflicts}; prepare future inventory")
+
+
 def main() -> None:
     cfg = Config()
     public = Api(cfg)
@@ -46,18 +66,7 @@ def main() -> None:
 
     # Start at SMOKE_DAYS_AHEAD and walk forward: load tests may have booked out the nearest days.
     first = int(os.environ.get("SMOKE_DAYS_AHEAD", "1"))
-    for offset in range(first, first + 14):
-        day = (date.today() + timedelta(days=offset)).isoformat()
-        slots = public.call("GET", "/v1/availability/slots", params={"date": day}).json()["slots"]
-        if slots:
-            break
-    assert slots, f"no available slots in the 14 days from {first} days ahead; onboard a merchant first"
-    slot = slots[0]
-    print(f"1. found {len(slots)} slots on {day}; booking {slot['resource_name']} at {slot['start_time']}")
-
-    key = str(uuid.uuid4())
-    booking = alice.book(slot["slot_id"], key)
-    assert booking.status_code == 201, booking.text
+    day, slot, key, booking = reserve_slot(public, alice, first)
     replay = alice.book(slot["slot_id"], key)
     assert replay.status_code == 200 and replay.json()["booking_id"] == booking.json()["booking_id"]
     print(f"2. booked {booking.json()['reference']}; retry with the same key returned the same booking")
