@@ -114,5 +114,11 @@ export function book(data) {
   check(response, { 'booking 201 or 409': (r) => r.status === 201 || r.status === 409 }, tags);
 }
 export function handleSummary(data) {
-  return { 'summary.json': JSON.stringify({ ...data, workload: manifest }, null, 2) };
+  const ended = Date.now();
+  const measurement = {
+    started_at: new Date(ended - data.state.testRunDurationMs).toISOString(),
+    ended_at: new Date(ended).toISOString(),
+    timing_method: 'k6 run duration and handleSummary UTC clock',
+  };
+  return { 'summary.json': JSON.stringify({ ...data, workload: manifest, measurement }, null, 2) };
 }

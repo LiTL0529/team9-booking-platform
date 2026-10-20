@@ -142,6 +142,7 @@ def main() -> None:
     while True:
         services = ecs.describe_services(cluster='booking-test', services=SERVICES)['services']
         sample = {'minute': round((time.monotonic() - started) / 60, 2),
+                  'at': datetime.now(UTC).isoformat(),
                   **{s['serviceName']: s['runningCount'] for s in services}}
         timeline.append(sample)
         print(f"  t+{sample['minute']:5.1f} min " + ' '.join(f'{s}={sample[s]}' for s in SERVICES), flush=True)
