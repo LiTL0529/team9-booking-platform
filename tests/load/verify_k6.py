@@ -46,7 +46,7 @@ threading.Thread(target=server.serve_forever, daemon=True).start()
 gateway = f"http://127.0.0.1:{server.server_port}"
 try:
     manifest, slots = p.prepare(
-        gateway, "dummy", [{"name": "first", "rate": 5, "seconds": 3}, {"name": "peak", "rate": 5, "seconds": 3}], 1, 1
+        gateway, "dummy", [{"name": "first", "rate": 5, "seconds": 2}, {"name": "peak", "rate": 10, "seconds": 2}], 1, 1
     )
     (build / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
     (build / "slots.json").write_text(json.dumps(slots), encoding="utf-8")
@@ -82,6 +82,10 @@ try:
         return metrics.get(name, {}).get("values", {}).get("count", 0)
     assert count("search_requests") == 24, "Unexpected number of search requests"
     assert count("booking_requests") == 6
+    assert count('search_requests{phase:first}') == 8
+    assert count('booking_requests{phase:first}') == 2
+    assert metrics['search_latency{phase:first}']['values']['p(95)'] >= 0
+    assert metrics['successful_booking_latency{phase:first}']['values']['p(95)'] >= 0
     assert len(set(state["posts"])) == 6
     assert count("successful_bookings") == 4
     assert count("booking_conflicts") == 1
