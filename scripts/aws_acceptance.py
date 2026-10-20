@@ -228,6 +228,17 @@ class Acceptance:
             measured = json.loads(path.read_text(encoding='utf-8'))
             self.record('fixed_capacity', tasks=count, test_exit=result.returncode, evidence=str(path),
                         assessment=measured['assessment'])
+            if count == 4:
+                race_path = self.path.with_name('concurrency-' + self.run + '.json')
+                race = subprocess.run([
+                    sys.executable, '-X', 'utf8', '-u', str(ROOT / 'tests/concurrency/same_slot.py'),
+                    '--requests', '100', '--min-tasks', '3',
+                    '--date', (date.today() + timedelta(days=9)).isoformat(), '--output', str(race_path)],
+                    cwd=ROOT, check=False,
+                    env={**os.environ, 'PLATFORM_API_KEY': os.environ.get('LOADTEST_API_KEY', os.environ['PLATFORM_API_KEY'])})
+                evidence = json.loads(race_path.read_text(encoding='utf-8')) if race_path.is_file() else None
+                self.record('multi_task_concurrency', passed=race.returncode == 0, evidence=evidence)
+                require(race.returncode == 0, '100-request race did not pass across at least three tasks')
 
 
 def main():

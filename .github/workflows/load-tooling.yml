@@ -2,9 +2,9 @@ name: acceptance-tooling
 
 on:
   push:
-    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, tests/operations/**, tests/e2e/**, scripts/aws_acceptance.py, scripts/aws_backlog_acceptance.py, scripts/aws_release_acceptance.py, scripts/wait_ecs_deployment.py, .github/workflows/load-tooling.yml]
+    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, tests/operations/**, tests/e2e/**, tests/concurrency/**, scripts/aws_acceptance.py, scripts/aws_backlog_acceptance.py, scripts/aws_release_acceptance.py, scripts/wait_ecs_deployment.py, .github/workflows/load-tooling.yml]
   pull_request:
-    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, tests/operations/**, tests/e2e/**, scripts/aws_acceptance.py, scripts/aws_backlog_acceptance.py, scripts/aws_release_acceptance.py, scripts/wait_ecs_deployment.py, .github/workflows/load-tooling.yml]
+    paths: [scripts/aws_loadtest.py, scripts/prepare_load_test.py, tests/load/**, tests/operations/**, tests/e2e/**, tests/concurrency/**, scripts/aws_acceptance.py, scripts/aws_backlog_acceptance.py, scripts/aws_release_acceptance.py, scripts/wait_ecs_deployment.py, .github/workflows/load-tooling.yml]
   workflow_dispatch:
 
 permissions:
