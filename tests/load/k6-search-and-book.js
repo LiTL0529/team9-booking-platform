@@ -58,6 +58,7 @@ for (const phase of phases) {
 export const options = { scenarios, thresholds };
 
 export function setup() {
+  console.info('K6_MEASUREMENT_START=' + new Date().toISOString());
   if (__ENV.ID_TOKEN) return { token: __ENV.ID_TOKEN };
   const response = http.post(`${GATEWAY}/auth/login`, JSON.stringify({
     username: __ENV.USERNAME || 'loadtester', password: __ENV.PASSWORD || 'Passw0rd!',

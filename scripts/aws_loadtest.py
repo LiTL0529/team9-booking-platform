@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import json
 import os
+import subprocess
 import sys
 import time
 from datetime import UTC, datetime
@@ -108,6 +110,7 @@ def main() -> None:
     parser.add_argument('--profile', choices=['full', 'short'], default='full')
     parser.add_argument('--days', type=int)
     parser.add_argument('--start-day', type=int, default=1)
+    parser.add_argument('--profiles-file', type=Path, default=REPO / 'tests/load/profiles.json')
     args = parser.parse_args()
     days = args.days if args.days is not None else (6 if args.profile == 'full' else 2)
     if days < 1 or args.start_day < 1:
@@ -127,13 +130,21 @@ def main() -> None:
         return env(name, base64.b64encode((REPO / path).read_bytes()).decode())
 
     cb, ecs, logs = session.client('codebuild'), session.client('ecs'), session.client('logs')
+    source_paths = [Path(__file__), REPO / 'tests/load/k6-search-and-book.js',
+                    REPO / 'scripts/prepare_load_test.py', args.profiles_file]
+    fingerprints = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in source_paths}
+    try:
+        revision = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=REPO, capture_output=True,
+                                  text=True, encoding='utf-8', check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        revision = None
     build = cb.start_build(
         projectName='booking-test-images', buildspecOverride=BUILDSPEC, timeoutInMinutesOverride=60,
         computeTypeOverride='BUILD_GENERAL1_MEDIUM',
         environmentVariablesOverride=[
             source('K6_SCRIPT_B64', 'tests/load/k6-search-and-book.js'),
             source('PREPARE_SCRIPT_B64', 'scripts/prepare_load_test.py'),
-            source('PROFILES_B64', 'tests/load/profiles.json'),
+            source('PROFILES_B64', args.profiles_file),
             env('GATEWAY', os.environ['PLATFORM_GATEWAY']), env('API_KEY', os.environ['LOADTEST_API_KEY']),
             env('ID_TOKEN', token), env('PROFILE', args.profile), env('DAYS', str(days)),
             env('START_DAY', str(args.start_day)), env('LOAD_MANIFEST', './load-manifest.json'),
@@ -142,8 +153,13 @@ def main() -> None:
     )['build']
     print(f"k6 ({args.profile}) in CodeBuild {build['id']}; preflight runs before measurement", flush=True)
     timeline, started = [], time.monotonic()
+    revisions_start, revisions_end, deployment_observed = None, None, False
     while True:
         services = ecs.describe_services(cluster='booking-test', services=SERVICES)['services']
+        revisions_end = {s['serviceName']: s['taskDefinition'].split('/')[-1] for s in services}
+        if revisions_start is None:
+            revisions_start = revisions_end.copy()
+        deployment_observed = deployment_observed or any(len(s['deployments']) > 1 for s in services)
         sample = {'minute': round((time.monotonic() - started) / 60, 2),
                   'at': datetime.now(UTC).isoformat(),
                   **{s['serviceName']: s['runningCount'] for s in services}}
@@ -172,6 +188,10 @@ def main() -> None:
     assessment = assess(summary)
     result = {'schema_version': 2, 'profile': args.profile, 'build_id': build['id'],
               'build_status': build['buildStatus'], 'summary': summary, 'assessment': assessment,
+              'generator_revision': revision,
+              'generator_sha256': fingerprints,
+              'environment': {'task_definitions_start': revisions_start, 'task_definitions_end': revisions_end,
+                              'deployment_observed_during_build': deployment_observed},
               'timeline': timeline, 'timeline_origin': 'CodeBuild dispatch; includes preparation time'}
     out = REPO / '.local' / f"loadtest-v2-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
     out.parent.mkdir(exist_ok=True)
