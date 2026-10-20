@@ -60,7 +60,7 @@ def git_sha() -> str:
     """Image tag: the commit, plus a hash of uncommitted changes to anything baked into the images
     (ECR tags are immutable, so a changed image must never reuse a tag)."""
     def git(*a: str) -> str:
-        return subprocess.run(["git", *a], cwd=REPO, check=True, capture_output=True, text=True).stdout
+        return subprocess.run(["git", *a], cwd=REPO, check=True, capture_output=True, text=True, encoding="utf-8").stdout
     tag = git("rev-parse", "--short=12", "HEAD").strip()
     diff = git("diff", "HEAD", "--", "libs", "services", "docker")
     if diff:
@@ -72,7 +72,14 @@ def git_sha() -> str:
 def tf(*args: str, capture: bool = False) -> str:
     cmd = [TERRAFORM, f"-chdir={TF_DIR}", *args]
     print("$", " ".join(cmd[:4]), "..." if len(cmd) > 4 else "")
-    result = subprocess.run(cmd, check=True, text=True, capture_output=capture)
+    # Terraform writes UTF-8; without an explicit encoding Windows decodes with the ANSI code page (GBK here)
+    result = subprocess.run(cmd, text=True, encoding="utf-8", errors="replace", capture_output=capture)
+    if result.returncode != 0:
+        if capture:
+            sys.stderr.write(result.stderr)
+            if "credential" in result.stderr or "expired" in result.stderr:
+                sys.stderr.write("\nAWS sign-in has expired: run `aws login`, then try again.\n")
+        sys.exit(f"terraform {args[0]} failed (exit {result.returncode})")
     return result.stdout if capture else ""
 
 
@@ -126,7 +133,7 @@ def step_base(args) -> None:
 def build_images(tag: str) -> None:
     out = tf_outputs()
     buf = io.BytesIO()
-    files = subprocess.run(["git", "ls-files"], cwd=REPO, check=True, capture_output=True, text=True).stdout.split()
+    files = subprocess.run(["git", "ls-files"], cwd=REPO, check=True, capture_output=True, text=True, encoding="utf-8").stdout.split()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for name in files:
             if name.startswith(("libs/", "services/", "docker/")):
