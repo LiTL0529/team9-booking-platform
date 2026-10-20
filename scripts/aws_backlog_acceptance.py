@@ -18,11 +18,62 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
 
-from aws_acceptance import Acceptance, require
+from aws_acceptance import Acceptance, require, until
 from platform_client import Api, Config, login
 from prepare_load_test import prepare
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def notification_count(checks, task_definition, customer_id):
+    """Read only the synthetic customer's own inbox count using the existing task role."""
+    query = (
+        "import os;from sqlalchemy import create_engine,text;"
+        "engine=create_engine(os.environ['DATABASE_URL']);c=engine.connect();"
+        "c.exec_driver_sql('SET TRANSACTION READ ONLY');"
+        "n=c.execute(text('SELECT count(*) FROM notifications WHERE customer_id = :u'),"
+        "{'u':" + repr(customer_id) + "}).scalar_one();"
+        "print('NOTIFICATION_COUNT='+str(n));c.close();engine.dispose()"
+    )
+    task = checks.ecs.run_task(
+        cluster="booking-test",
+        taskDefinition=task_definition,
+        launchType="FARGATE",
+        networkConfiguration=checks.original["notification"]["networkConfiguration"],
+        overrides={"containerOverrides": [{"name": "app", "command": ["python", "-c", query]}]},
+    )
+    require(not task.get("failures"), "Read-only notification count task did not start")
+    task_arn = task["tasks"][0]["taskArn"]
+
+    def stopped():
+        value = checks.ecs.describe_tasks(cluster="booking-test", tasks=[task_arn])["tasks"][0]
+        return value if value["lastStatus"] == "STOPPED" else None
+
+    try:
+        ended = until(stopped, "Notification count task did not stop", timeout=300, interval=5)
+    except TimeoutError:
+        checks.ecs.stop_task(cluster="booking-test", task=task_arn, reason="Read-only acceptance task timeout")
+        raise
+    require(
+        next(v for v in ended["containers"] if v["name"] == "app").get("exitCode") == 0, "Read-only notification count command failed"
+    )
+    logs = checks.session.client("logs")
+
+    def count_logged():
+        try:
+            events = logs.get_log_events(
+                logGroupName="/ecs/test-notification", logStreamName="app/app/" + task_arn.split("/")[-1], startFromHead=True
+            )["events"]
+        except logs.exceptions.ResourceNotFoundException:
+            return None
+        for event in events:
+            if "NOTIFICATION_COUNT=" in event["message"]:
+                return {"count": int(event["message"].split("NOTIFICATION_COUNT=")[1].strip())}
+        return None
+
+    result = until(count_logged, "Read-only count was not logged", timeout=60, interval=5)
+    checks.record("notification_count_verified", customer_id=customer_id, count=result["count"], read_only_task=task_arn)
+    return result["count"]
 
 
 def main():
@@ -179,38 +230,7 @@ def main():
         }
         scale = any("sqs-backlog" in str(v["Cause"]) for v in activity) and max(v["desired"] for v in timeline) > 2
         # Verify persisted output, rather than treating approximate queue emptiness as delivery proof.
-        query = (
-            "import os;from sqlalchemy import create_engine,text;"
-            "engine=create_engine(os.environ['DATABASE_URL']);c=engine.connect();"
-            "n=c.execute(text('SELECT count(*) FROM notifications WHERE customer_id = :u'),{'u':'backlog-"
-            + run
-            + "'}).scalar_one();print('NOTIFICATION_COUNT='+str(n));c.close();engine.dispose()"
-        )
-        task = a.ecs.run_task(
-            cluster="booking-test",
-            taskDefinition=original,
-            launchType="FARGATE",
-            networkConfiguration=a.original["notification"]["networkConfiguration"],
-            overrides={"containerOverrides": [{"name": "app", "command": ["python", "-c", query]}]},
-        )
-        require(not task.get("failures"), "Could not run read-only notification count task")
-        task_arn = task["tasks"][0]["taskArn"]
-        deadline = time.time() + 180
-        while time.time() < deadline:
-            ended = a.ecs.describe_tasks(cluster="booking-test", tasks=[task_arn])["tasks"][0]
-            if ended["lastStatus"] == "STOPPED":
-                break
-            time.sleep(5)
-        require(
-            ended["lastStatus"] == "STOPPED" and next(v for v in ended["containers"] if v["name"] == "app").get("exitCode") == 0,
-            "Notification count task failed",
-        )
-        output = s.client("logs").get_log_events(
-            logGroupName="/ecs/test-notification", logStreamName="app/app/" + task_arn.split("/")[-1], startFromHead=True
-        )["events"]
-        persisted = next(
-            (int(v["message"].split("NOTIFICATION_COUNT=")[1].strip()) for v in output if "NOTIFICATION_COUNT=" in v["message"]), None
-        )
+        persisted = notification_count(a, original, "backlog-" + run)
         passed = (
             empty >= 3
             and persisted == 5000
@@ -233,7 +253,7 @@ def main():
             ),
         )
         a.records.update(completed=True, passed=passed, normal_processing=(args.processing_delay_ms == 0))
-        require(passed, 'Backlog acceptance did not meet all recorded gates; inspect delivery and scaling separately')
+        require(passed, "Backlog acceptance did not meet all recorded gates; inspect delivery and scaling separately")
     except BaseException as exc:
         a.records.update(passed=False, failure=str(exc))
         a.save()
