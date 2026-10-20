@@ -126,6 +126,7 @@ def main() -> None:
     cb, ecs, logs = session.client('codebuild'), session.client('ecs'), session.client('logs')
     build = cb.start_build(
         projectName='booking-test-images', buildspecOverride=BUILDSPEC, timeoutInMinutesOverride=60,
+        computeTypeOverride='BUILD_GENERAL1_MEDIUM',
         environmentVariablesOverride=[
             source('K6_SCRIPT_B64', 'tests/load/k6-search-and-book.js'),
             source('PREPARE_SCRIPT_B64', 'scripts/prepare_load_test.py'),

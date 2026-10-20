@@ -37,7 +37,9 @@ for (const phase of phases) {
     scenarios[`${phase.name}_${op}`] = {
       executor: 'constant-arrival-rate', exec: op, rate, timeUnit: '1s',
       startTime: `${phase.start_seconds}s`, duration: `${phase.seconds}s`, gracefulStop: '30s',
-      preAllocatedVUs: Math.max(2, Math.min(50, rate)), maxVUs: Math.max(20, rate * 3),
+      // Allocate enough workers for one second of in-flight requests before
+      // the phase starts; growing workers during a step can drop arrivals.
+      preAllocatedVUs: Math.max(2, rate), maxVUs: Math.max(20, rate * 3),
       tags: { phase: phase.name, op },
     };
   }
