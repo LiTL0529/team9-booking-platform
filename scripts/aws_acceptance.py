@@ -50,7 +50,7 @@ class Acceptance:
         self.targets = {t['ResourceId'].split('/')[-1]: t for t in self.scaling.describe_scalable_targets(
             ServiceNamespace='ecs')['ScalableTargets'] if t['ResourceId'].startswith(f'service/{CLUSTER}/')}
         self.changed = set()
-        self.expected_counts = {name: value['desiredCount'] for name, value in self.original.items()}
+        self.expected_counts = {}
         self.expected_deployments = {}
         self.save()
 
@@ -85,7 +85,8 @@ class Acceptance:
         def ready():
             states = [s for s in self.services() if s['serviceName'] in names]
             return states if all(len(s['deployments']) == 1
-                                 and s['desiredCount'] == self.expected_counts[s['serviceName']]
+                                 and (s['serviceName'] not in self.expected_counts or
+                                      s['desiredCount'] == self.expected_counts[s['serviceName']])
                                  and (s['serviceName'] not in self.expected_deployments or
                                       s['deployments'][0]['id'] == self.expected_deployments[s['serviceName']])
                                  and s['deployments'][0].get('rolloutState') == 'COMPLETED'
@@ -102,7 +103,7 @@ class Acceptance:
                 ScalableDimension=value['ScalableDimension'], MinCapacity=value['MinCapacity'],
                 MaxCapacity=value['MaxCapacity'], SuspendedState=value.get('SuspendedState', {}))
             self.ecs.update_service(cluster=CLUSTER, service=name, desiredCount=self.original[name]['desiredCount'])
-            self.expected_counts[name] = self.original[name]['desiredCount']
+            self.expected_counts.pop(name, None)
         if self.changed:
             self.stable(list(self.changed))
             self.record('settings_restored', services=sorted(self.changed))

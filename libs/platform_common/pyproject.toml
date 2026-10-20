@@ -25,6 +25,7 @@ dependencies = [
     "opentelemetry-instrumentation-sqlalchemy==0.65b0",
     "opentelemetry-instrumentation-httpx==0.65b0",
     "opentelemetry-sdk-extension-aws==2.0.2",
+    "opentelemetry-propagator-aws-xray==1.0.2",
 ]
 
 [tool.setuptools.packages.find]
