@@ -225,16 +225,18 @@ jobs:
           import os
           from pathlib import Path
           key = os.environ['ZAP_AUTH_HEADER_VALUE']
+          if not key or not Path('zap-api-report/zap-api.json').is_file():
+              raise RuntimeError('API scan produced no JSON report or credential was missing')
+          safe = Path('zap-api-sanitized')
+          safe.mkdir()
           for path in Path('zap-api-report').glob('zap-api.*'):
               value = path.read_text(encoding='utf-8')
-              path.write_text(value.replace(key, '[REDACTED]'), encoding='utf-8')
-          if not Path('zap-api-report/zap-api.json').is_file():
-              raise RuntimeError('API scan produced no JSON report')
+              (safe / path.name).write_text(value.replace(key, '[REDACTED]'), encoding='utf-8')
           PY
           exit "$SCAN_EXIT"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: zap-api-${{ inputs.service }}
-          path: zap-api-report/zap-api.*
+          path: zap-api-sanitized/zap-api.*
           if-no-files-found: ignore
