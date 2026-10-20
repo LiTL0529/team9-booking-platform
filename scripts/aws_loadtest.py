@@ -94,9 +94,12 @@ def assess(summary: dict) -> dict:
     valid = bool(rows) and all(r['workload_delivered'] for r in rows)
     valid = valid and metric(summary, 'dropped_iterations', 'count', 0) == 0
     valid = valid and metric(summary, 'inventory_errors', 'count', 0) == 0
+    peak_rate = max((r['target_http_rps'] for r in rows), default=0)
+    peak_rows = [r for r in rows if r['target_http_rps'] == peak_rate]
     return {'workload_valid': valid, 'phase_results': rows,
+            'latency_acceptance_scope': 'every phase at the maximum planned HTTP rate; ramp stages reported',
             'all_thresholds_met': bool(rows) and bool(thresholds) and all(v is True for v in thresholds)
-                                  and all(r['search_target_met'] and r['booking_target_met'] for r in rows),
+                                  and all(r['search_target_met'] and r['booking_target_met'] for r in peak_rows),
             'peak_phase': rows[-1] if rows else None}
 
 

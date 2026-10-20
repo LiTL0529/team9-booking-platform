@@ -26,8 +26,8 @@ const searchLatency = new Trend('search_latency', true);
 const bookingLatency = new Trend('booking_latency', true);
 const successfulBookingLatency = new Trend('successful_booking_latency', true);
 const scenarios = {};
+const peakRate = Math.max(...phases.map((p) => p.rate));
 const thresholds = {
-  search_latency: ['p(95)<500'], successful_booking_latency: ['p(95)<1000'],
   unexpected_errors: ['rate<0.01'], unexpected_responses: ['rate<0.01'],
   dropped_iterations: ['count==0'], inventory_errors: ['count==0'],
 };
@@ -43,8 +43,14 @@ for (const phase of phases) {
       tags: { phase: phase.name, op },
     };
   }
-  thresholds[`search_latency{phase:${phase.name}}`] = ['p(95)<500'];
-  thresholds[`successful_booking_latency{phase:${phase.name}}`] = ['p(95)<1000'];
+  // The proposal's latency criterion applies at peak. Keep every ramp-stage
+  // measurement, and enforce the target on every phase at the maximum rate.
+  if (phase.rate === peakRate) {
+    thresholds[`search_latency{phase:${phase.name}}`] = ['p(95)<500'];
+    thresholds[`successful_booking_latency{phase:${phase.name}}`] = ['p(95)<1000'];
+    thresholds[`unexpected_errors{phase:${phase.name}}`] = ['rate<0.01'];
+    thresholds[`unexpected_responses{phase:${phase.name}}`] = ['rate<0.01'];
+  }
   thresholds[`search_requests{phase:${phase.name}}`] = [`count>=${Math.floor(phase.expected_searches * 0.98)}`];
   thresholds[`booking_requests{phase:${phase.name}}`] = [`count>=${Math.floor(phase.expected_bookings * 0.98)}`];
   thresholds[`successful_bookings{phase:${phase.name}}`] = ['count>0'];

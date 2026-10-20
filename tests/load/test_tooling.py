@@ -99,3 +99,25 @@ def test_inventory_exhaustion_invalidates_workload():
     data = summary()
     data['metrics']['inventory_errors'] = {'values': {'count': 1}}
     assert not runner.assess(data)['workload_valid']
+
+
+def test_proposal_latency_targets_apply_to_all_peak_phases_and_keep_ramp_results():
+    data = summary()
+    phase = data['workload']['phases'][0]
+    phase.update(rate=10, expected_searches=16, expected_bookings=4)
+    metrics = data['metrics']
+    metrics['search_requests{phase:peak}']['values']['count'] = 16
+    metrics['booking_requests{phase:peak}']['values']['count'] = 4
+    metrics['successful_booking_latency{phase:peak}']['values']['p(95)'] = 800
+    ramp = {'name': 'ramp', 'rate': 5, 'seconds': 2, 'expected_searches': 8, 'expected_bookings': 2}
+    data['workload']['phases'].insert(0, ramp)
+    for key, value in summary()['metrics'].items():
+        if '{phase:peak}' in key:
+            metrics[key.replace('phase:peak', 'phase:ramp')] = value
+    metrics['search_latency{phase:ramp}']['values']['p(95)'] = 900
+    result = runner.assess(data)
+    assert not result['phase_results'][0]['search_target_met']
+    assert result['all_thresholds_met']
+    # A second peak phase cannot be hidden behind a good final peak phase.
+    ramp['rate'] = 10
+    assert not runner.assess(data)['all_thresholds_met']
