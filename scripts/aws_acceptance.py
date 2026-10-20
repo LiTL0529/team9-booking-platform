@@ -50,6 +50,8 @@ class Acceptance:
         self.targets = {t['ResourceId'].split('/')[-1]: t for t in self.scaling.describe_scalable_targets(
             ServiceNamespace='ecs')['ScalableTargets'] if t['ResourceId'].startswith(f'service/{CLUSTER}/')}
         self.changed = set()
+        self.expected_counts = {name: value['desiredCount'] for name, value in self.original.items()}
+        self.expected_deployments = {}
         self.save()
 
     def services(self):
@@ -77,11 +79,15 @@ class Acceptance:
             SuspendedState={'DynamicScalingInSuspended': True, 'DynamicScalingOutSuspended': True,
                             'ScheduledScalingSuspended': True})
         self.ecs.update_service(cluster=CLUSTER, service=name, desiredCount=count)
+        self.expected_counts[name] = count
 
     def stable(self, names=SERVICES, timeout=900):
         def ready():
             states = [s for s in self.services() if s['serviceName'] in names]
             return states if all(len(s['deployments']) == 1
+                                 and s['desiredCount'] == self.expected_counts[s['serviceName']]
+                                 and (s['serviceName'] not in self.expected_deployments or
+                                      s['deployments'][0]['id'] == self.expected_deployments[s['serviceName']])
                                  and s['deployments'][0].get('rolloutState') == 'COMPLETED'
                                  and s['runningCount'] == s['desiredCount'] and s['pendingCount'] == 0
                                  for s in states) else None
@@ -96,6 +102,7 @@ class Acceptance:
                 ScalableDimension=value['ScalableDimension'], MinCapacity=value['MinCapacity'],
                 MaxCapacity=value['MaxCapacity'], SuspendedState=value.get('SuspendedState', {}))
             self.ecs.update_service(cluster=CLUSTER, service=name, desiredCount=self.original[name]['desiredCount'])
+            self.expected_counts[name] = self.original[name]['desiredCount']
         if self.changed:
             self.stable(list(self.changed))
             self.record('settings_restored', services=sorted(self.changed))
@@ -148,13 +155,20 @@ class Acceptance:
         require(len(notifications) == 1, 'Confirmation delivered more than once')
         self.record('notification_caught_up_once', passed=True, reference=anchor['reference'])
 
+        before = {name: self.ecs.list_tasks(cluster=CLUSTER, serviceName=name)['taskArns'] for name in SERVICES}
         for name in SERVICES:
-            self.ecs.update_service(cluster=CLUSTER, service=name, forceNewDeployment=True)
+            updated = self.ecs.update_service(cluster=CLUSTER, service=name, forceNewDeployment=True)['service']
+            self.expected_deployments[name] = next(d['id'] for d in updated['deployments'] if d['status'] == 'PRIMARY')
         self.stable()
+        after = {name: self.ecs.list_tasks(cluster=CLUSTER, serviceName=name)['taskArns'] for name in SERVICES}
+        require(all(not (set(before[name]) & set(after[name])) for name in SERVICES),
+                'An old task remained after the restart')
         persisted = alice.call('GET', f'/v1/bookings/{anchor["booking_id"]}').json()
         require(persisted['status'] == 'CONFIRMED' and persisted['reference'] == anchor['reference'],
                 'Confirmed booking did not survive restart')
-        self.record('all_services_restarted_booking_persisted', passed=True, reference=anchor['reference'])
+        self.record('all_services_restarted_booking_persisted', passed=True, reference=anchor['reference'],
+                    before_task_ids={k: [v.split('/')[-1] for v in values] for k, values in before.items()},
+                    after_task_ids={k: [v.split('/')[-1] for v in values] for k, values in after.items()})
         alice.call('POST', f'/v1/bookings/{anchor["booking_id"]}/cancel')
 
     def rollback(self):
@@ -167,18 +181,21 @@ class Acceptance:
         app['command'] = ['python', '-c', 'raise SystemExit(42)']
         bad = self.ecs.register_task_definition(**body)['taskDefinition']['taskDefinitionArn']
         self.record('failed_revision_started', original=previous, failed_revision=bad)
+        started = datetime.now(UTC)
         self.ecs.update_service(cluster=CLUSTER, service='merchant', taskDefinition=bad)
         observed_failure = False
+        observed_bad = False
         try:
             def rolled_back():
-                nonlocal observed_failure
+                nonlocal observed_failure, observed_bad
                 current = next(x for x in self.services() if x['serviceName'] == 'merchant')
+                observed_bad = observed_bad or any(d['taskDefinition'] == bad for d in current['deployments'])
                 if any(d.get('rolloutState') == 'FAILED' and d['taskDefinition'] == bad for d in current['deployments']):
                     observed_failure = True
-                reasons = [v['message'] for v in current['events'][:12]]
+                reasons = [v['message'] for v in current['events'] if v['createdAt'] >= started]
                 if any('rollback' in v.lower() or 'circuit breaker' in v.lower() for v in reasons):
                     observed_failure = True
-                return current if (observed_failure and current['taskDefinition'] == previous
+                return current if (observed_bad and observed_failure and current['taskDefinition'] == previous
                                    and len(current['deployments']) == 1
                                    and current['deployments'][0].get('rolloutState') == 'COMPLETED') else None
             value = until(rolled_back, 'Automatic rollback did not complete', timeout=900)
