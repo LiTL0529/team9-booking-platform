@@ -1,0 +1,7 @@
+{
+  "short": [
+    {"name": "baseline25", "rate": 25, "seconds": 60},
+    {"name": "replacement25", "rate": 25, "seconds": 180},
+    {"name": "release25", "rate": 25, "seconds": 480}
+  ]
+}
