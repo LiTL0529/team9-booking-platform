@@ -240,10 +240,49 @@ class Acceptance:
                 self.record('multi_task_concurrency', passed=race.returncode == 0, evidence=evidence)
                 require(race.returncode == 0, '100-request race did not pass across at least three tasks')
 
+    def scale_in(self):
+        names = ['availability', 'booking']
+        for name in names:
+            require(self.targets[name]['MinCapacity'] == 2, 'Scale-in exercise expects a two-task baseline')
+            self.fixed(name, 4)
+        self.stable(names)
+        self.record('scale_in_baseline', running_tasks_each=4,
+                    scope='Controlled idle-scale-in exercise; separate from the full-load scale-out timeline')
+        resumed = datetime.now(UTC)
+        for name in names:
+            target = self.targets[name]
+            self.scaling.register_scalable_target(
+                ServiceNamespace='ecs', ResourceId=target['ResourceId'],
+                ScalableDimension=target['ScalableDimension'], MinCapacity=target['MinCapacity'],
+                MaxCapacity=target['MaxCapacity'], SuspendedState=target.get('SuspendedState', {}))
+            self.expected_counts.pop(name, None)
+        self.record('dynamic_scale_in_resumed', resumed_at=resumed.isoformat())
+
+        def scaled_in():
+            states = {v['serviceName']: v for v in self.services() if v['serviceName'] in names}
+            causes = {}
+            for name in names:
+                target = self.targets[name]
+                rows = self.scaling.describe_scaling_activities(
+                    ServiceNamespace='ecs', ResourceId=target['ResourceId'],
+                    ScalableDimension=target['ScalableDimension'])['ScalingActivities']
+                causes[name] = [{k: v.get(k) for k in ['StartTime', 'Description', 'Cause', 'StatusCode']}
+                                for v in rows if v['StartTime'] >= resumed and 'AlarmLow' in str(v.get('Cause'))
+                                and v['StatusCode'] == 'Successful']
+            self.record('scale_in_sample', services={n: {'desired': v['desiredCount'], 'running': v['runningCount']}
+                                                    for n, v in states.items()})
+            ready = all(v['desiredCount'] == v['runningCount'] == 2 and v['pendingCount'] == 0
+                        and causes[n] for n, v in states.items())
+            return causes if ready else None
+
+        causes = until(scaled_in, 'CPU-driven scale-in did not complete', timeout=1200, interval=30)
+        self.record('automatic_idle_scale_in', passed=True, from_tasks_each=4, to_tasks_each=2,
+                    activities=causes, scope='No manual desired-count reduction after scaling was resumed')
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['recovery', 'rollback', 'capacity'])
+    parser.add_argument('command', choices=['recovery', 'rollback', 'capacity', 'scale-in'])
     parser.add_argument('--start-day', type=int, default=11)
     parser.add_argument('--days', type=int, default=8)
     args = parser.parse_args()
@@ -252,7 +291,7 @@ def main():
         if args.command == 'capacity':
             checks.capacity(args.start_day, args.days)
         else:
-            getattr(checks, args.command)()
+            getattr(checks, args.command.replace('-', '_'))()
         checks.records['completed'] = True
         if args.command != 'capacity':
             checks.records['passed'] = True
