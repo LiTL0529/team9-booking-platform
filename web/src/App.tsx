@@ -31,6 +31,12 @@ function roleLabel(u: Claims): string {
   return 'Customer';
 }
 
+/** /partner is served by the CourtHub shell behind CloudFront; send it to the FitPal page. */
+function PartnerRedirect() {
+  useEffect(() => window.location.replace('/partner/index.html'), []);
+  return null;
+}
+
 function UnreadBadge() {
   const [count, setCount] = useState(0);
   useEffect(() => {
@@ -110,6 +116,7 @@ export default function App() {
             <Route path="/inbox" element={user ? <Inbox /> : <Navigate to="/login" state={{ from: '/inbox' }} />} />
             <Route path="/merchant" element={isMerchant(user) ? <MerchantConsole /> : <Navigate to="/login" state={{ from: '/merchant' }} />} />
             <Route path="/admin" element={isAdmin(user) ? <Admin /> : <Navigate to="/login" state={{ from: '/admin' }} />} />
+            <Route path="/partner/*" element={<PartnerRedirect />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </main>
@@ -117,6 +124,7 @@ export default function App() {
           <div>
             <span>CourtHub · Team 9 multi-merchant booking platform</span>
             <span className="spacer" />
+            <a href="/partner/index.html">Partner demo: FitPal</a>
             <span>Times shown in Singapore time (UTC+8)</span>
           </div>
         </footer>

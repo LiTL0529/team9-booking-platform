@@ -51,14 +51,22 @@ jobs:
       - name: Runtime configuration for this environment
         env:
           API_KEY: ${{ secrets.WEB_API_KEY }}
+          PARTNER_API_KEY: ${{ secrets.PARTNER_API_KEY }}
         run: |
           cat > dist/config.json <<EOF
           {"apiBaseUrl": "", "apiKey": "${API_KEY}", "authMode": "cognito",
            "cognitoRegion": "${{ vars.AWS_REGION || 'ap-southeast-1' }}", "cognitoClientId": "${{ vars.COGNITO_WEB_CLIENT_ID }}"}
           EOF
+          # FitPal, the demo partner app, uses the partner key and the partner app client, not the web ones.
+          cat > dist/partner-config.json <<EOF
+          {"apiBaseUrl": "", "apiKey": "${PARTNER_API_KEY}", "authMode": "cognito",
+           "cognitoRegion": "${{ vars.AWS_REGION || 'ap-southeast-1' }}", "cognitoClientId": "${{ vars.COGNITO_PARTNER_CLIENT_ID }}"}
+          EOF
       - name: Upload to S3 and invalidate CloudFront
         run: |
-          aws s3 sync dist "s3://${{ vars.WEB_BUCKET }}" --delete --cache-control "public,max-age=31536000,immutable" --exclude index.html --exclude config.json
+          aws s3 sync dist "s3://${{ vars.WEB_BUCKET }}" --delete --cache-control "public,max-age=31536000,immutable" --exclude index.html --exclude config.json --exclude partner/index.html --exclude partner-config.json
           aws s3 cp dist/index.html "s3://${{ vars.WEB_BUCKET }}/index.html" --cache-control "no-cache"
+          aws s3 cp dist/partner/index.html "s3://${{ vars.WEB_BUCKET }}/partner/index.html" --cache-control "no-cache"
           aws s3 cp dist/config.json "s3://${{ vars.WEB_BUCKET }}/config.json" --cache-control "no-store"
-          aws cloudfront create-invalidation --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" --paths /index.html /config.json
+          aws s3 cp dist/partner-config.json "s3://${{ vars.WEB_BUCKET }}/partner-config.json" --cache-control "no-store"
+          aws cloudfront create-invalidation --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" --paths /index.html /config.json /partner/index.html /partner-config.json
