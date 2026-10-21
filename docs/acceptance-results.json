@@ -1,0 +1,707 @@
+{
+  "updated_at_utc": "2026-10-21T04:01:22.985620+00:00",
+  "test_counts": {
+    "core": 60,
+    "workload_and_operations": 23
+  },
+  "configuration": {
+    "task_vcpu": 0.25,
+    "availability_min_max": [
+      2,
+      12
+    ],
+    "booking_min_max": [
+      2,
+      8
+    ],
+    "notification_min_max": [
+      2,
+      5
+    ],
+    "merchant_min_max": [
+      2,
+      2
+    ],
+    "catalogue_min_max": [
+      2,
+      2
+    ],
+    "availability_cpu_target_percent": 35,
+    "booking_cpu_target_percent": 35,
+    "load_generator_compute": "BUILD_GENERAL1_LARGE"
+  },
+  "pipelines": [
+    {
+      "service": "merchant-service",
+      "id": 39434349553,
+      "source_commit": "63cc57ea2106042b64043d6f08158756c0818457",
+      "url": "https://github.com/LiTL0529/team9-booking-platform/actions/runs/39434349553",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "pipeline / static analysis, secrets and dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / lint, unit, integration and contract tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / build and scan image",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / deploy to test (rolling update)",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / smoke test and DAST",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "service": "catalogue-service",
+      "id": 39434349573,
+      "source_commit": "63cc57ea2106042b64043d6f08158756c0818457",
+      "url": "https://github.com/LiTL0529/team9-booking-platform/actions/runs/39434349573",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "pipeline / static analysis, secrets and dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / lint, unit, integration and contract tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / build and scan image",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / deploy to test (rolling update)",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / smoke test and DAST",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "service": "availability-service",
+      "id": 39434349609,
+      "source_commit": "63cc57ea2106042b64043d6f08158756c0818457",
+      "url": "https://github.com/LiTL0529/team9-booking-platform/actions/runs/39434349609",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "pipeline / static analysis, secrets and dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / lint, unit, integration and contract tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / build and scan image",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / deploy to test (rolling update)",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / smoke test and DAST",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "service": "booking-service",
+      "id": 39434349616,
+      "source_commit": "63cc57ea2106042b64043d6f08158756c0818457",
+      "url": "https://github.com/LiTL0529/team9-booking-platform/actions/runs/39434349616",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "pipeline / lint, unit, integration and contract tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / static analysis, secrets and dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / build and scan image",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / deploy to test (rolling update)",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / smoke test and DAST",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "service": "notification-service",
+      "id": 39434349589,
+      "source_commit": "63cc57ea2106042b64043d6f08158756c0818457",
+      "url": "https://github.com/LiTL0529/team9-booking-platform/actions/runs/39434349589",
+      "conclusion": "success",
+      "jobs": [
+        {
+          "name": "pipeline / lint, unit, integration and contract tests",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / static analysis, secrets and dependencies",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / build and scan image",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / deploy to test (rolling update)",
+          "conclusion": "success"
+        },
+        {
+          "name": "pipeline / smoke test and DAST",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "api_documentation": [
+    {
+      "service": "merchant",
+      "http": 200,
+      "contract_matches": true,
+      "missing_api_key": 403
+    },
+    {
+      "service": "catalogue",
+      "http": 200,
+      "contract_matches": true,
+      "missing_api_key": 403
+    },
+    {
+      "service": "availability",
+      "http": 200,
+      "contract_matches": true,
+      "missing_api_key": 403
+    },
+    {
+      "service": "booking",
+      "http": 200,
+      "contract_matches": true,
+      "missing_api_key": 403
+    },
+    {
+      "service": "notification",
+      "http": 200,
+      "contract_matches": true,
+      "missing_api_key": 403
+    }
+  ],
+  "full_load": {
+    "build_id": "booking-test-images:1dfa98a1-e46d-4013-a3fa-f1a478049cea",
+    "generator_revision": "186f0121c53c7cb97a48e3d8b87be31a4575a9d8",
+    "measurement": {
+      "started_at": "2026-10-20T15:19:46.535Z",
+      "ended_at": "2026-10-20T15:54:46.662Z",
+      "timing_method": "k6 run duration and handleSummary UTC clock"
+    },
+    "assessment": {
+      "workload_valid": true,
+      "phase_results": [
+        {
+          "phase": "r25",
+          "target_http_rps": 25,
+          "seconds": 300,
+          "search_requests": 6000,
+          "booking_requests": 1500,
+          "successful_bookings": 1500,
+          "actual_http_rps": 25.0,
+          "booking_share": 0.2,
+          "search_p95_ms": 342.84412280000004,
+          "successful_booking_p95_ms": 275.4070233,
+          "workload_delivered": true,
+          "search_target_met": true,
+          "booking_target_met": true
+        },
+        {
+          "phase": "r50",
+          "target_http_rps": 50,
+          "seconds": 300,
+          "search_requests": 12000,
+          "booking_requests": 3000,
+          "successful_bookings": 3000,
+          "actual_http_rps": 50.0,
+          "booking_share": 0.2,
+          "search_p95_ms": 1156.519932399997,
+          "successful_booking_p95_ms": 557.7939839999991,
+          "workload_delivered": true,
+          "search_target_met": false,
+          "booking_target_met": true
+        },
+        {
+          "phase": "r100",
+          "target_http_rps": 100,
+          "seconds": 300,
+          "search_requests": 24000,
+          "booking_requests": 6000,
+          "successful_bookings": 6000,
+          "actual_http_rps": 100.0,
+          "booking_share": 0.2,
+          "search_p95_ms": 756.5232623999996,
+          "successful_booking_p95_ms": 766.41058025,
+          "workload_delivered": true,
+          "search_target_met": false,
+          "booking_target_met": true
+        },
+        {
+          "phase": "r150",
+          "target_http_rps": 150,
+          "seconds": 300,
+          "search_requests": 36000,
+          "booking_requests": 9000,
+          "successful_bookings": 9000,
+          "actual_http_rps": 150.0,
+          "booking_share": 0.2,
+          "search_p95_ms": 307.91035559999966,
+          "successful_booking_p95_ms": 588.0542455499992,
+          "workload_delivered": true,
+          "search_target_met": true,
+          "booking_target_met": true
+        },
+        {
+          "phase": "r200",
+          "target_http_rps": 200,
+          "seconds": 300,
+          "search_requests": 48000,
+          "booking_requests": 12000,
+          "successful_bookings": 12000,
+          "actual_http_rps": 200.0,
+          "booking_share": 0.2,
+          "search_p95_ms": 203.59002359999988,
+          "successful_booking_p95_ms": 328.1138041999999,
+          "workload_delivered": true,
+          "search_target_met": true,
+          "booking_target_met": true
+        },
+        {
+          "phase": "peak200",
+          "target_http_rps": 200,
+          "seconds": 600,
+          "search_requests": 96000,
+          "booking_requests": 24000,
+          "successful_bookings": 24000,
+          "actual_http_rps": 200.0,
+          "booking_share": 0.2,
+          "search_p95_ms": 165.93227425,
+          "successful_booking_p95_ms": 258.14692374999976,
+          "workload_delivered": true,
+          "search_target_met": true,
+          "booking_target_met": true
+        }
+      ],
+      "latency_acceptance_scope": "every phase at the maximum planned HTTP rate; ramp stages reported",
+      "all_thresholds_met": true,
+      "peak_phase": {
+        "phase": "peak200",
+        "target_http_rps": 200,
+        "seconds": 600,
+        "search_requests": 96000,
+        "booking_requests": 24000,
+        "successful_bookings": 24000,
+        "actual_http_rps": 200.0,
+        "booking_share": 0.2,
+        "search_p95_ms": 165.93227425,
+        "successful_booking_p95_ms": 258.14692374999976,
+        "workload_delivered": true,
+        "search_target_met": true,
+        "booking_target_met": true
+      }
+    },
+    "dropped_iterations": 0,
+    "unexpected_errors": {
+      "rate": 0,
+      "passes": 0,
+      "fails": 277500
+    },
+    "conflicts": {}
+  },
+  "capacity": {
+    "completed": true,
+    "runs": [
+      {
+        "tasks": 1,
+        "assessment": {
+          "workload_valid": false,
+          "phase_results": [
+            {
+              "phase": "r25",
+              "target_http_rps": 25,
+              "seconds": 30,
+              "search_requests": 600,
+              "booking_requests": 150,
+              "successful_bookings": 150,
+              "actual_http_rps": 25.0,
+              "booking_share": 0.2,
+              "search_p95_ms": 725.6445372999999,
+              "successful_booking_p95_ms": 181.82214745,
+              "workload_delivered": true,
+              "search_target_met": false,
+              "booking_target_met": true
+            },
+            {
+              "phase": "r100",
+              "target_http_rps": 100,
+              "seconds": 60,
+              "search_requests": 4764,
+              "booking_requests": 1169,
+              "successful_bookings": 569,
+              "actual_http_rps": 98.88333333333334,
+              "booking_share": 0.19703354121018035,
+              "search_p95_ms": 10014.538103800001,
+              "successful_booking_p95_ms": 9535.5848572,
+              "workload_delivered": false,
+              "search_target_met": false,
+              "booking_target_met": false
+            },
+            {
+              "phase": "peak200",
+              "target_http_rps": 200,
+              "seconds": 90,
+              "search_requests": 14400,
+              "booking_requests": 3536,
+              "successful_bookings": 364,
+              "actual_http_rps": 199.2888888888889,
+              "booking_share": 0.19714540588760035,
+              "search_p95_ms": 7421.04138215,
+              "successful_booking_p95_ms": 7374.99537645,
+              "workload_delivered": true,
+              "search_target_met": false,
+              "booking_target_met": false
+            }
+          ],
+          "latency_acceptance_scope": "every phase at the maximum planned HTTP rate; ramp stages reported",
+          "all_thresholds_met": false,
+          "peak_phase": {
+            "phase": "peak200",
+            "target_http_rps": 200,
+            "seconds": 90,
+            "search_requests": 14400,
+            "booking_requests": 3536,
+            "successful_bookings": 364,
+            "actual_http_rps": 199.2888888888889,
+            "booking_share": 0.19714540588760035,
+            "search_p95_ms": 7421.04138215,
+            "successful_booking_p95_ms": 7374.99537645,
+            "workload_delivered": true,
+            "search_target_met": false,
+            "booking_target_met": false
+          }
+        },
+        "peak_successful_http_rps": 32.08888888888889,
+        "peak_unexpected_error_rate": 0.8389830508474576,
+        "dropped_iterations": 133
+      },
+      {
+        "tasks": 2,
+        "assessment": {
+          "workload_valid": false,
+          "phase_results": [
+            {
+              "phase": "r25",
+              "target_http_rps": 25,
+              "seconds": 30,
+              "search_requests": 600,
+              "booking_requests": 150,
+              "successful_bookings": 150,
+              "actual_http_rps": 25.0,
+              "booking_share": 0.2,
+              "search_p95_ms": 100.60522754999991,
+              "successful_booking_p95_ms": 205.64305495,
+              "workload_delivered": true,
+              "search_target_met": true,
+              "booking_target_met": true
+            },
+            {
+              "phase": "r100",
+              "target_http_rps": 100,
+              "seconds": 60,
+              "search_requests": 4800,
+              "booking_requests": 1200,
+              "successful_bookings": 1200,
+              "actual_http_rps": 100.0,
+              "booking_share": 0.2,
+              "search_p95_ms": 1816.8422660500003,
+              "successful_booking_p95_ms": 1717.5591479,
+              "workload_delivered": true,
+              "search_target_met": false,
+              "booking_target_met": false
+            },
+            {
+              "phase": "peak200",
+              "target_http_rps": 200,
+              "seconds": 90,
+              "search_requests": 14400,
+              "booking_requests": 3524,
+              "successful_bookings": 1203,
+              "actual_http_rps": 199.15555555555557,
+              "booking_share": 0.19660790002231646,
+              "search_p95_ms": 10012.96377325,
+              "successful_booking_p95_ms": 9483.833426799998,
+              "workload_delivered": false,
+              "search_target_met": false,
+              "booking_target_met": false
+            }
+          ],
+          "latency_acceptance_scope": "every phase at the maximum planned HTTP rate; ramp stages reported",
+          "all_thresholds_met": false,
+          "peak_phase": {
+            "phase": "peak200",
+            "target_http_rps": 200,
+            "seconds": 90,
+            "search_requests": 14400,
+            "booking_requests": 3524,
+            "successful_bookings": 1203,
+            "actual_http_rps": 199.15555555555557,
+            "booking_share": 0.19660790002231646,
+            "search_p95_ms": 10012.96377325,
+            "successful_booking_p95_ms": 9483.833426799998,
+            "workload_delivered": false,
+            "search_target_met": false,
+            "booking_target_met": false
+          }
+        },
+        "peak_successful_http_rps": 113.07777777777778,
+        "peak_unexpected_error_rate": 0.43221379156438294,
+        "dropped_iterations": 77
+      },
+      {
+        "tasks": 4,
+        "assessment": {
+          "workload_valid": true,
+          "phase_results": [
+            {
+              "phase": "r25",
+              "target_http_rps": 25,
+              "seconds": 30,
+              "search_requests": 600,
+              "booking_requests": 150,
+              "successful_bookings": 150,
+              "actual_http_rps": 25.0,
+              "booking_share": 0.2,
+              "search_p95_ms": 71.72765879999999,
+              "successful_booking_p95_ms": 114.462428,
+              "workload_delivered": true,
+              "search_target_met": true,
+              "booking_target_met": true
+            },
+            {
+              "phase": "r100",
+              "target_http_rps": 100,
+              "seconds": 60,
+              "search_requests": 4800,
+              "booking_requests": 1200,
+              "successful_bookings": 1200,
+              "actual_http_rps": 100.0,
+              "booking_share": 0.2,
+              "search_p95_ms": 130.77535715000002,
+              "successful_booking_p95_ms": 250.92410644999944,
+              "workload_delivered": true,
+              "search_target_met": true,
+              "booking_target_met": true
+            },
+            {
+              "phase": "peak200",
+              "target_http_rps": 200,
+              "seconds": 90,
+              "search_requests": 14400,
+              "booking_requests": 3600,
+              "successful_bookings": 3600,
+              "actual_http_rps": 200.0,
+              "booking_share": 0.2,
+              "search_p95_ms": 1134.29262845,
+              "successful_booking_p95_ms": 990.5443233499996,
+              "workload_delivered": true,
+              "search_target_met": false,
+              "booking_target_met": true
+            }
+          ],
+          "latency_acceptance_scope": "every phase at the maximum planned HTTP rate; ramp stages reported",
+          "all_thresholds_met": false,
+          "peak_phase": {
+            "phase": "peak200",
+            "target_http_rps": 200,
+            "seconds": 90,
+            "search_requests": 14400,
+            "booking_requests": 3600,
+            "successful_bookings": 3600,
+            "actual_http_rps": 200.0,
+            "booking_share": 0.2,
+            "search_p95_ms": 1134.29262845,
+            "successful_booking_p95_ms": 990.5443233499996,
+            "workload_delivered": true,
+            "search_target_met": false,
+            "booking_target_met": true
+          }
+        },
+        "peak_successful_http_rps": 199.9777777777778,
+        "peak_unexpected_error_rate": 0.00011111111111111112,
+        "dropped_iterations": 0
+      }
+    ],
+    "concurrency": [
+      {
+        "passed": true,
+        "status_counts": {
+          "201": 1,
+          "409": 99
+        },
+        "distinct_tasks": 4,
+        "required_tasks": 3,
+        "requests": 100,
+        "at": "2026-10-20T16:31:31.299468+00:00"
+      }
+    ]
+  },
+  "release": {
+    "passed": true,
+    "events": [
+      {
+        "check": "booking_task_stopped",
+        "at": "2026-10-20T15:57:18.383139+00:00",
+        "elapsed_seconds": 66.30015
+      },
+      {
+        "check": "booking_task_replaced",
+        "at": "2026-10-20T16:00:29.206974+00:00",
+        "elapsed_seconds": 256.682363
+      },
+      {
+        "check": "independent_release_dispatched",
+        "at": "2026-10-20T16:00:32.354621+00:00",
+        "elapsed_seconds": 256.682363
+      },
+      {
+        "check": "rolling_deployment_observed",
+        "at": "2026-10-20T16:03:20.633668+00:00",
+        "elapsed_seconds": 429.908204
+      },
+      {
+        "check": "rolling_release_completed_under_load",
+        "at": "2026-10-20T16:09:57.300967+00:00",
+        "elapsed_seconds": 826.317867
+      }
+    ]
+  },
+  "backlog": [
+    {
+      "configuration": [
+        {
+          "check": "test_configuration",
+          "at": "2026-10-20T16:35:29.725763+00:00",
+          "processing_delay_ms": 0,
+          "consumer_concurrency": 2,
+          "task_vcpu": 0.25,
+          "synthetic_events": 5000,
+          "booking_probe_rate": 2,
+          "description": "Normal notification processing; no artificial delivery delay"
+        }
+      ],
+      "results": [
+        {
+          "passed": false,
+          "drain_seconds": 306.9745839000025,
+          "queue_quiet_verified": true,
+          "queue_scale_out_observed": false,
+          "persisted_notifications": 5000,
+          "booking": {
+            "baseline": {
+              "requests": 61,
+              "status_counts": {
+                "201": 61
+              },
+              "successful_booking_p95_ms": 488.42030000378145
+            },
+            "burst": {
+              "requests": 601,
+              "status_counts": {
+                "201": 601
+              },
+              "successful_booking_p95_ms": 411.69160000572447
+            }
+          }
+        }
+      ]
+    },
+    {
+      "configuration": [
+        {
+          "check": "test_configuration",
+          "at": "2026-10-20T16:49:10.779790+00:00",
+          "processing_delay_ms": 500,
+          "consumer_concurrency": 2,
+          "task_vcpu": 0.25,
+          "synthetic_events": 5000,
+          "booking_probe_rate": 2,
+          "description": "Simulated notification delivery cost; not the normal zero-delay drain time"
+        }
+      ],
+      "results": [
+        {
+          "passed": false,
+          "drain_seconds": 904.7455619999964,
+          "queue_quiet_verified": false,
+          "queue_scale_out_observed": true,
+          "persisted_notifications": 5000,
+          "booking": {
+            "baseline": {
+              "requests": 62,
+              "status_counts": {
+                "201": 62
+              },
+              "successful_booking_p95_ms": 387.56350000039674
+            },
+            "burst": {
+              "requests": 1764,
+              "status_counts": {
+                "201": 1764
+              },
+              "successful_booking_p95_ms": 395.0295000031474
+            }
+          }
+        }
+      ]
+    },
+    {
+      "configuration": [],
+      "results": []
+    }
+  ],
+  "scale_in": {
+    "passed": false
+  },
+  "queue_reliability": {
+    "passed": false
+  },
+  "recovery": {
+    "persistence_verified": true,
+    "raw_combined_harness_passed": false,
+    "validation_note": "The combined harness required the original Booking task count after normal autoscaling; independent task replacement and booking persistence were verified separately.",
+    "rollback_passed": true,
+    "rollback_finished_at": "2026-10-20T13:48:51.674Z"
+  },
+  "trace_verified": true,
+  "team_records": "Pending team confirmation",
+  "pending_cloud_reason": "CLI session expired; corrected cost-burst rerun, retry/DLQ/duplicate exercise, idle scale-in and final baseline/smoke await valid CLI login."
+}

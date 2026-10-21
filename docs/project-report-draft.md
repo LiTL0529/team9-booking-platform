@@ -4,7 +4,7 @@ Practice Module for Graduate Certificate in Architecting Scalable Systems, SE34F
 
 Team 9: CHEN YINLING, HE JIACHANG, LUO RUNZHOU, SANG HAOXIANG, ZHANG YUZHAO
 
-Working draft, 20 October 2026. This draft follows the supplied Project Report Template. Actual individual effort, responsibilities and presentation assignments are **pending team confirmation**. Presentation feedback must be incorporated after the presentation; the recorded final-report deadline is 16 November 2026. Planned targets are distinguished from observed results throughout.
+Working draft, 21 October 2026 (UTC+8). This draft follows the supplied Project Report Template. Actual individual effort, responsibilities and presentation assignments are **pending team confirmation**. Presentation feedback must be incorporated after the presentation; the recorded final-report deadline is 16 November 2026. Planned targets are distinguished from observed results throughout.
 
 ## 1. Introduction
 
@@ -52,7 +52,7 @@ Planned milestones were revised proposal on 9 October, contracts and first deplo
 
 ### 2.2 Project Status
 
-The core booking application is deployed. Verification on 20 October recorded 59 passing core tests; the added gateway-trace regression brings the current core suite to 60 tests (13 shared and 47 service tests). The corrected load and deployment tools have 12 additional regression checks, recorded separately from core business tests. Cloud acceptance status and evidence are maintained in `docs/acceptance-status.md`; the latest measured results are in the accompanying acceptance appendix.
+The core booking application is deployed. Verification on 20 October recorded 59 passing core tests; the added gateway-trace regression brings the current core suite to 60 tests (13 shared and 47 service tests). The corrected load and deployment tools have 23 additional regression checks, recorded separately from core business tests. Cloud acceptance status and evidence are maintained in `docs/acceptance-status.md`; the latest measured results are in the accompanying acceptance appendix.
 
 Implemented functionality does not imply that every proposed quality target has passed. Earlier load results used a different request mix, and the 20 October afternoon rehearsal overlapped deployments. Those measurements remain historical evidence with limitations. The corrected runner now records the actual search/booking split, distinct booking inventory, successful-booking latency, conflicts, unexpected responses and dropped arrivals per phase.
 
@@ -160,13 +160,82 @@ The proposal requires 100 merchants, 1,000 resources and at least 20,000 future 
 
 The corrected runner prepares distinct free slots before measurement and schedules independent search and booking requests. One booking iteration sends one POST and cannot disappear because search returned no inventory. Success-only booking latency, expected 409 conflicts, other unexpected responses and dropped arrivals are separate metrics. It checks actual request counts for each phase and saves failing results. A short rehearsal is not the full-duration acceptance test.
 
-The evening stable baseline still failed. After task resource tuning, a three-minute rehearsal delivered approximately 199.5 HTTP/s at peak with search P95 900 ms and successful-booking P95 490 ms. It still had 42 dropped searches and did not pass all criteria. This is an observed improvement, not a declaration of final acceptance. Subsequent measurements in the acceptance appendix supersede this rehearsal for final status; historical results remain unchanged.
+The stable pre-tuning short baseline failed. After task resource tuning, the short rehearsal reached about 199.5 HTTP/s at peak with search P95 900 ms and successful-booking P95 490 ms, but had 43 dropped iterations. The first complete 35-minute run had zero unexpected errors and a clean final peak plateau (search 158 ms, booking 558 ms), but its first 200 HTTP/s stage had booking P95 1,119 ms and the run dropped 206 scheduled arrivals. Those failed records remain unchanged.
+
+The next configuration lowers the Booking CPU target from 50% to 35%, reserves eight seconds of generator concurrency and uses a larger CodeBuild worker. Ramp-stage latency is explicitly exported without applying peak SLOs to the ramp. Workload rates and peak acceptance gates are unchanged.
+
+Latest full-workload result: all measured acceptance gates passed.
+
+Build: booking-test-images:1dfa98a1-e46d-4013-a3fa-f1a478049cea. Generator source: 186f0121c53c7cb97a48e3d8b87be31a4575a9d8. Measurement: 2026-10-20T15:19:46.535Z to 2026-10-20T15:54:46.662Z. Preparation traffic is excluded. The following P95 values use each phase; booking values include HTTP 201 only.
+
+| Phase | Target HTTP/s | Actual HTTP/s | Search P95 ms | 201 booking P95 ms |
+| --- | --- | --- | --- | --- |
+| r25 | 25 | 25.0 | 342.8 | 275.4 |
+| r50 | 50 | 50.0 | 1156.5 | 557.8 |
+| r100 | 100 | 100.0 | 756.5 | 766.4 |
+| r150 | 150 | 150.0 | 307.9 | 588.1 |
+| r200 | 200 | 200.0 | 203.6 | 328.1 |
+| peak200 | 200 | 200.0 | 165.9 | 258.1 |
+
+Dropped iterations: 0. Unexpected server/network error rate: 0. Deployment overlap observed: False. Actual task definitions and scaling settings are retained with the raw result. The two maximum-rate phases are both checked; a passing final plateau does not hide a failing earlier peak stage. Search P95 exceeded 500 ms at the 50 and 100 HTTP/s ramp stages, so this result does not establish that search budget at every traffic level. Latency is measured by k6 from the CodeBuild client (sending, waiting and receiving), not from geographically distributed end users.
+
+The fixed-capacity comparison suspends dynamic scaling for Availability and Booking, measures the same offered profile at one, two and four tasks each, then restores the previous scaling policy and limits.
+
+| Tasks each | Sent HTTP/s | Successful HTTP/s | Peak errors % | Search P95 ms | 201 booking P95 ms | Run dropped |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 199.3 | 32.1 | 83.90 | 7421.0 | 7375.0 | 133 |
+| 2 | 199.2 | 113.1 | 43.22 | 10013.0 | 9483.8 | 77 |
+| 4 | 200.0 | 200.0 | 0.01 | 1134.3 | 990.5 | 0 |
+
+These runs have an offered peak of 200 HTTP/s. Successful HTTP/s counts search 200 and booking 201 responses; sent HTTP/s includes failed responses, and the error column includes server/network failures. Dropped counts cover the complete short run. Reaching the offered ceiling does not establish maximum capacity. The accelerated three-minute profile can also capture cold-cache and saturation effects; it does not replace the full sustained workload. Low-capacity saturation and failures are retained; unrestricted linear growth is not assumed.
+
+The strict 100-request same-slot race returned {'201': 1, '409': 99} across 4 identified Booking tasks. Network failures are not counted as conflicts.
+
+The separate controlled four-to-two automatic idle scale-in exercise remains pending.
+
+Each queue exercise sends exactly 5,000 synthetic booking events, checks SNS batch failures, records visible/in-flight depth and actual running tasks, and verifies the final synthetic-customer inbox count through a read-only query. Two-per-second booking probes record the baseline and burst period separately.
+
+Run: 2026-10-20T16:35:29.725763+00:00. Per-event simulated processing cost: 0 ms. Queue quiet in 307.0 s; persisted notifications: 5000; actual queue-policy worker scale-out while work remained: False. Overall recorded gate: False.
+
+| Booking probe period | Requests | Status counts | 201 P95 ms |
+| --- | --- | --- | --- |
+| baseline | 61 | {'201': 61} | 488.4 |
+| burst | 601 | {'201': 601} | 411.7 |
+
+Run: 2026-10-20T16:49:10.779790+00:00. Per-event simulated processing cost: 500 ms. Queue quietness not confirmed before the 904.7-second measurement ended; persisted notifications: 5000; actual queue-policy worker scale-out while work remained: True. Overall recorded gate: False.
+
+| Booking probe period | Requests | Status counts | 201 P95 ms |
+| --- | --- | --- | --- |
+| baseline | 62 | {'201': 62} | 387.6 |
+| burst | 1764 | {'201': 1764} | 395.0 |
+
+A nonzero per-event cost is an explicit stress configuration, not the normal processing speed. If normal processing clears the burst before extra workers run, this is reported as delivery success without observed queue scale-out. The first cost-simulation run persisted all 5,000 events and scaled workers, but continuous booking probes kept a small queue tail alive, so its original quietness gate remains failed. The corrected runner stops probes when no visible backlog remains with at most two in flight, then still requires three quiet samples and exactly 5,000 persisted synthetic notifications. Low-rate probes check their latency budget and disclose the baseline/burst difference; they do not prove zero impact at the 200 HTTP/s peak.
 
 ### 4.2 Availability
 
 Application services normally run at least two tasks, with health checks, replacement, rolling release and deployment rollback. SNS/SQS separates booking from search projections and notification delivery. The controlled recovery runner records booking and cancellation with Availability stopped, booking with Notification stopped and catch-up after restart, and reservation durability after all service tasks are replaced. It records the intended failed revision and this run's circuit-breaker events for an actual startup failure rollback.
 
-Passing task/service recovery checks does not demonstrate RDS failover. Queue and DLQ settings, duplicate event tests and transient retry tests provide additional evidence, but each cloud exercise must be identified by its actual execution record. The final acceptance appendix states which drills ran and their results.
+Recorded AWS exercises confirmed booking and cancellation while Availability had zero tasks, booking while Notification had zero tasks, and exactly one confirmation after Notification restarted. A separate verification confirmed the reservation remained CONFIRMED after every service task was replaced. The first combined harness timed out because it incorrectly required the original autoscaled task count; its failed raw record is preserved and the durability evidence identifies this limitation.
+
+The startup-failure exercise deployed Merchant revision 6 with an immediate exit. ECS deployment history recorded ROLLBACK_SUCCESSFUL at 13:48:51 UTC, automatically restoring revision 5; final convergence was verified at 13:51:27 UTC. Healthy old tasks remained available. The failed revision was deregistered after the exercise.
+
+One X-Ray trace contains an API Gateway stage segment, a Booking HTTP 201 segment and the nested Notification BookingConfirmed consumer span. The corrected validator inspects nested spans; the first top-level-name-only harness result is retained.
+
+Passing task/service recovery checks does not demonstrate RDS failover. Queue/DLQ configuration and local duplicate/retry tests are separate from real cloud execution.
+
+The independent-release exercise uses a separate 25 HTTP/s, 80/20 workload. One Booking task is stopped, a healthy replacement is observed and only the Booking workflow is dispatched. Other four service task definitions must remain unchanged, and the new Booking revision must complete while measurement remains active. The controlled version release changes the version marker and image release; business features are unchanged.
+
+| Event | Elapsed seconds |
+| --- | --- |
+| booking task stopped | 66.3 |
+| booking task replaced | 256.7 |
+| independent release dispatched | 256.7 |
+| rolling deployment observed | 429.9 |
+| rolling release completed under load | 826.3 |
+
+Recorded recovery/release gate: True. This controlled workload does not establish a 200 HTTP/s fault-tolerance guarantee.
+
+Real retry/DLQ and duplicate-message evidence remains pending its dedicated synthetic-message exercise.
 
 ### 4.3 Security
 
@@ -194,7 +263,7 @@ Each service workflow runs linting, shared and service tests, database integrati
 
 Main-branch workflows assume a scoped AWS role through OIDC, push an immutable versioned image, read the service's current task definition, register the updated image and perform a rolling test-environment deployment. The waiter verifies the exact intended revision, nonzero desired count and completed task convergence. Smoke tests and ZAP follow successful deployment; verification cannot be silently disabled by the previous skip variable.
 
-The current scope has one cloud test environment. No production promotion process is claimed. The cloud test results must be tied to the workflow revision and executed jobs. Earlier four-service reruns failed at immutable tag overwrite and therefore did not execute deployment or smoke; pull-request success alone does not replace the missing cloud delivery evidence. The acceptance appendix records later complete runs when available.
+The current scope has one cloud test environment. No production promotion process is claimed. All five workflows for source 63cc57ea completed the tests, security checks, image build/push, intended-revision rollout, smoke and both web/API ZAP steps on 20 October. Run IDs are Merchant 39434349553, Catalogue 39434349573, Availability 39434349609, Booking 39434349616 and Notification 39434349589. Booking and Catalogue verification initially collided on shared inventory; serial retries passed. The smoke selector now shuffles candidates and retries explicit 409 conflicts only; five concurrent complete cloud smoke journeys passed. Permission/server failures still fail immediately. Scanner warnings remain disclosed; configured scan gates are not a guarantee of zero vulnerabilities.
 
 ## 6. Demonstration and Follow-up
 
