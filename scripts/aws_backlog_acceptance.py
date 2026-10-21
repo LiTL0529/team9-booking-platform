@@ -268,7 +268,9 @@ def main():
             "backlog_result",
             passed=passed,
             drain_seconds=drained_seconds,
-            drain_timing_method='Three quiet queue samples after stopping probes near the end; exact synthetic inbox count checked separately',
+            drain_timing_method=(
+                'Three quiet queue samples after stopping probes near the end; exact synthetic inbox count checked separately'
+            ),
             queue_scale_out_observed=scale,
             booking=summary,
             timeline=timeline,
