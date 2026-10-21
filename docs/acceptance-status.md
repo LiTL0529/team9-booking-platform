@@ -1,22 +1,35 @@
 # Acceptance status
 
-Updated 20 October 2026. Proposed acceptance criteria are kept separate from implemented features and observed results.
+Updated 21 October 2026 (UTC+8). Planned criteria, implementation and observed results are distinct.
 
-| Item | Status | Evidence / next action |
+Selected measured data is versioned in [acceptance-results.json](acceptance-results.json). The corrected queue rerun, real retry/DLQ/duplicate exercise, idle scale-in and final baseline/smoke await a valid AWS CLI session. Browser sign-in has not yet refreshed the CLI credentials.
+
+| Item | Status | Evidence / scope |
 | --- | --- | --- |
-| Core application and contracts | Verified locally | 59 passing core tests; five services running in AWS |
-| Revised load tools | Verified locally | 8 regression checks and a controlled real k6 run |
-| AWS business workflow | Verified historical run | Booking workflow 39050921193 includes smoke and scan steps |
-| Historical AWS load | Recorded, method limited | Run 2 was about 92.4/7.6 business HTTP requests; P95 is whole-run, booking includes conflicts |
-| Corrected short AWS workload | Failed rehearsal | 20 October: peak 139.8 HTTP/s, search P95 10,013 ms, 201-only booking P95 8,539 ms; 6,151 dropped iterations. Concurrent deployments prevent steady-state interpretation |
-| Full peak performance acceptance | Open | Corrected 35-minute cloud run with peak-stage 201-only booking latency |
-| Fixed 1/2/4 task capacity comparison | Open | Save original scaling settings, suspend dynamic scaling for controlled runs, then restore settings |
-| Four remaining service pipelines | Partly verified | OIDC and image push passed. Catalogue/Notification deploy passed; Merchant/Availability waiter timed out, then ECS converged. All four smoke/DAST jobs skipped; complete verification remains open |
-| Recovery / rollback evidence | Partly open | Record Availability outage, restart persistence and an actual liveness/startup failure rollback |
-| Public API documentation delivery | Verified in AWS | `/api-docs.html` displays all five services; `/v1/docs/<service>/openapi.json` matches repository contracts; missing API key returns 403 |
-| Team effort and speaking assignments | Pending team confirmation | User explicitly requested this status; do not invent actual effort |
-| Final report | Drafting remains | Use formal template and include presentation feedback before the recorded 16 November deadline |
+| Core application and contracts | Verified | 60 core tests; five AWS services |
+| Workload / operations tools | Verified | 23 regressions; controlled real k6; five concurrent cloud smoke journeys |
+| Complete per-service delivery | Verified | All five source-63cc57ea runs executed tests, security, push, exact rollout, smoke and web/API ZAP |
+| Public API documentation | Verified | /api-docs.html; five gateway specs match contracts; no key returns 403 |
+| Full 35-minute workload | Passed | Actual 80/20 HTTP; per-phase search/201-only booking P95; dropped arrivals retained |
+| Fixed 1/2/4 capacity comparison | Completed | Compare achieved rate and P95 under the same offered profile; not unrestricted capacity |
+| 100-request multi-task race | Verified | Require 1x201, 99x409, zero network failures and at least three task identities |
+| Automatic idle scale-in | Pending | Controlled 4-to-2 tasks for Availability and Booking; successful AlarmLow activities; no manual reduction after resuming scaling |
+| Availability / Notification outages | Verified facts | Booking/cancel with search off; booking with inbox off; one confirmation after restart |
+| Persistence and startup rollback | Verified separately | Reservation after every task replaced; ECS ROLLBACK_SUCCESSFUL for actual startup failure |
+| Gateway to Booking to Notification trace | Verified | One trace includes the nested Notification consumer span |
+| Task replacement / independent release under load | Verified | 25 HTTP/s controlled workload; other four service revisions must remain unchanged |
+| 5,000-event burst | See dated result appendix | Normal and optional simulated processing cost remain separate; 2/s booking probes |
+| Real queue retry / DLQ / duplicates | Pending | Dedicated synthetic malformed/duplicate messages; existing DLQ evidence preserved |
+| Actual team effort / responsibilities / speakers | Pending team confirmation | User explicitly requested this; do not invent effort |
+| Final report | Template draft prepared | Team records and presentation feedback remain required before recorded 16 Nov deadline |
 
-Source identifiers and raw logs are recorded in `.local/review/` and `.local/defense-build/`. Do not publish credentials or private raw infrastructure state as evidence.
+Peak SLOs apply to both 200 HTTP/s phases. Search P95 during the 50 and 100 HTTP/s ramp stages exceeded 500 ms and remains visible in the phase table; passing peak SLOs does not establish sub-500-ms search latency at every ramp stage.
 
-The current ECS deployment probes use `/health/live`. A readiness-only failure is not a valid demonstration that these probes trigger rollback. Application tasks span two AZs; the RDS and Redis test instances remain in a single AZ each.
+
+Complete pipeline IDs: Merchant 39434349553; Catalogue 39434349573; Availability 39434349609; Booking 39434349616; Notification 39434349589. Initial Booking/Catalogue smoke conflicts and serial retries remain recorded. Scanner warnings are not described as zero vulnerabilities.
+
+The original combined recovery harness failed a stale fixed-count wait after normal autoscaling. Outage facts and independent persistence verification are recorded separately; the failed raw result is preserved. Trace verification includes nested consumer subsegments.
+
+The test environment has single-AZ RDS/cache. Task/service recovery does not demonstrate database failover or multi-region recovery. Failed historical/short measurements remain historical evidence and are not overwritten.
+
+Latest readable deliverables: `../output/项目验收修复/`. Private raw records remain under `.local/acceptance` and `.local/loadtest-v2-*.json`; credentials and Terraform state are excluded from shared evidence.

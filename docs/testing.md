@@ -1,5 +1,11 @@
 # Testing and evidence
 
+Latest acceptance update: **21 October 2026 (UTC+8)**. The complete corrected 35-minute workload passed its actual 80/20 delivery and both peak-stage latency gates: 277,500 business HTTP requests, 55,500 successful bookings, no dropped iterations and no unexpected errors. The two 200 HTTP/s phases recorded search/201-booking P95 of 203.6/328.1 ms and 165.9/258.1 ms. Search P95 at the 50 and 100 HTTP/s ramp stages remained above 500 ms; this is not a claim of sub-500-ms latency at every stage.
+
+Current tested task ranges are Availability 2–12, Booking 2–8, Notification 2–5 and Merchant/Catalogue 2–2; Availability and Booking CPU targets are 35%. Tasks use 0.25 vCPU, the current regional Fargate quota is 30 vCPU, and the full-load generator uses a LARGE CodeBuild worker. Earlier quota, ranges, profiles and failed results below are dated historical observations. The full result records actual scaling configuration, task definitions, source/hash identifiers and UTC timing.
+
+See [acceptance status](acceptance-status.md) and the accompanying report for the fixed-capacity comparison, strict multi-task concurrency race, controlled idle scale-in, backlog and queue exercises. The separate 25 HTTP/s recovery/release test passed with 5,400 successful bookings, zero unexpected errors, actual task replacement and an in-measurement rollout of Booking only. It does not establish fault tolerance at 200 HTTP/s.
+
 ## Automated test suites (run in every pipeline)
 
 | Suite | Where | What it proves |
@@ -12,9 +18,9 @@
 | Notification | `services/notification/tests` | Inbox per customer, duplicate events ignored, unread count, authentication required |
 | Contract tests | every service | Live OpenAPI equals `contracts/openapi/<service>.json`; every emitted event validates against `contracts/events/*.schema.json` |
 
-Current verification on 2026-10-20: **59 core tests passed** (12 template + 47 service), using an isolated PostgreSQL instance for the service suites. The earlier 57-test result was a historical snapshot, not the current total.
+Current core suite: **60 tests** (13 template + 47 service), including the gateway-trace regression added after the earlier 59-test snapshot. Service tests use an isolated PostgreSQL instance. The earlier 57- and 59-test results remain historical snapshots.
 
-The revised load tooling has **8 additional regression tests** (`python -m pytest -q tests/load/test_tooling.py`). A real local k6 run against a controlled HTTP server also verified the 80/20 request counts, distinct slots across phases, continued booking requests when searches return no slots, separate 409 reporting, and failure on an unexpected 403. These verify the tools, not AWS capacity.
+The workload and operations tools have **23 additional regression tests** (`python -m pytest -q tests/load/test_tooling.py tests/operations`). A real local k6 run against a controlled HTTP server also verified lower- and peak-stage P95 export, the 80/20 request counts, distinct slots across phases, continued booking requests when searches return no slots, separate 409 reporting, and failure on an unexpected 403. These verify the tools, not AWS capacity.
 
 ## System tests against a running deployment
 
@@ -45,7 +51,7 @@ quota 6 vCPU, so Availability was capped at 6 tasks.
 | Bookings made / expected 409s | 18,074 / 595 | 20,140 / 536 | – |
 | Peak tasks (avail / booking / notif) | 6 / 3 / 2 | 7 / 5 / 3 | – |
 
-All latency values above are whole-run summaries, not separately measured peak-phase values. Running-task samples can include transient deployment/replacement overlap. Current configured task ranges are Availability 2–6, Booking 2–5, Notification 2–5, and Merchant/Catalogue 2–2. Account vCPU quota and service MaxCapacity are separate constraints. The brief sample of 7 tasks alone does not establish an autoscaling limit of 7 or a proven root cause of latency.
+All latency values above are whole-run summaries, not separately measured peak-phase values. Running-task samples can include transient deployment/replacement overlap. At that historical configuration, task ranges were Availability 2–6, Booking 2–5, Notification 2–5 and Merchant/Catalogue 2–2. Account vCPU quota and service MaxCapacity are separate constraints. The brief sample of 7 tasks alone does not establish an autoscaling limit of 7 or a proven root cause of latency.
 
 Fixes between the runs (all shipped as a rolling update with no downtime):
 1. Load-balancer health checks use an async `/health/live` (no database), 3 failures, 60 s grace —
