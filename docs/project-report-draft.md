@@ -191,9 +191,11 @@ These runs have an offered peak of 200 HTTP/s. Successful HTTP/s counts search 2
 
 The strict 100-request same-slot race returned {'201': 1, '409': 99} across 4 identified Booking tasks. Network failures are not counted as conflicts.
 
-The separate controlled four-to-two automatic idle scale-in exercise remains pending.
+A separate controlled idle exercise first held Availability and Booking at four running tasks each. It then resumed their original scaling settings without manually reducing desired counts. Both returned to two desired and running tasks, with successful CPU AlarmLow scaling activities after scaling was resumed. This verifies idle scale-in separately from the full-load scale-out timeline; it is not presented as an uninterrupted full-load-to-idle curve.
 
 Each queue exercise sends exactly 5,000 synthetic booking events, checks SNS batch failures, records visible/in-flight depth and actual running tasks, and verifies the final synthetic-customer inbox count through a read-only query. Two-per-second booking probes record the baseline and burst period separately.
+
+The 5,000-event SNS batch publication took 287.8 seconds. Queue completion timing starts when publication begins and includes that period; it is not a pure consumer drain time after instantaneous enqueue.
 
 Run: 2026-10-20T16:35:29.725763+00:00. Per-event simulated processing cost: 0 ms. Queue quiet in 307.0 s; persisted notifications: 5000; actual queue-policy worker scale-out while work remained: False. Overall recorded gate: False.
 
@@ -202,12 +204,23 @@ Run: 2026-10-20T16:35:29.725763+00:00. Per-event simulated processing cost: 0 ms
 | baseline | 61 | {'201': 61} | 488.4 |
 | burst | 601 | {'201': 601} | 411.7 |
 
+The 5,000-event SNS batch publication took 72.8 seconds. Queue completion timing starts when publication begins and includes that period; it is not a pure consumer drain time after instantaneous enqueue.
+
 Run: 2026-10-20T16:49:10.779790+00:00. Per-event simulated processing cost: 500 ms. Queue quietness not confirmed before the 904.7-second measurement ended; persisted notifications: 5000; actual queue-policy worker scale-out while work remained: True. Overall recorded gate: False.
 
 | Booking probe period | Requests | Status counts | 201 P95 ms |
 | --- | --- | --- | --- |
 | baseline | 62 | {'201': 62} | 387.6 |
 | burst | 1764 | {'201': 1764} | 395.0 |
+
+The 5,000-event SNS batch publication took 131.4 seconds. Queue completion timing starts when publication begins and includes that period; it is not a pure consumer drain time after instantaneous enqueue.
+
+Run: 2026-10-21T04:53:04.363074+00:00. Per-event simulated processing cost: 500 ms. Queue quiet in 587.3 s; persisted notifications: 5000; actual queue-policy worker scale-out while work remained: True. Overall recorded gate: True.
+
+| Booking probe period | Requests | Status counts | 201 P95 ms |
+| --- | --- | --- | --- |
+| baseline | 62 | {'201': 62} | 450.7 |
+| burst | 1099 | {'201': 1099} | 437.9 |
 
 A nonzero per-event cost is an explicit stress configuration, not the normal processing speed. If normal processing clears the burst before extra workers run, this is reported as delivery success without observed queue scale-out. The first cost-simulation run persisted all 5,000 events and scaled workers, but continuous booking probes kept a small queue tail alive, so its original quietness gate remains failed. The corrected runner stops probes when no visible backlog remains with at most two in flight, then still requires three quiet samples and exactly 5,000 persisted synthetic notifications. Low-rate probes check their latency budget and disclose the baseline/burst difference; they do not prove zero impact at the 200 HTTP/s peak.
 
@@ -235,7 +248,9 @@ The independent-release exercise uses a separate 25 HTTP/s, 80/20 workload. One 
 
 Recorded recovery/release gate: True. This controlled workload does not establish a 200 HTTP/s fault-tolerance guarantee.
 
-Real retry/DLQ and duplicate-message evidence remains pending its dedicated synthetic-message exercise.
+The dedicated queue reliability exercise sent two copies of one valid synthetic event and persisted 1 notification. A deliberately malformed event retried and reached the DLQ with receive count 6. Only that exercise's own DLQ message was removed after observation. Recorded gate: True.
+
+After the controlled exercises, final read-only verification found all five services at two desired and running tasks with no pending tasks and one completed deployment each. Original scaling limits and suspension flags were restored, Notification used normal zero-delay processing, and the final end-to-end smoke passed.
 
 ### 4.3 Security
 
@@ -271,7 +286,7 @@ The live demonstration should show one coherent customer journey: discovery, res
 
 Quality claims should use dated evidence: the 100-request same-slot test, per-phase cloud measurements, task counts, recovery records and complete executed workflow jobs. The prepared presentation contains genuine application, pipeline and ECS screenshots. If the live environment fails, switch to those dated records and explain their limits.
 
-Before submission the team must confirm actual member effort, responsibility and presentation allocation; review the final experiment results; record presentation feedback and responses; and verify the institution's submission instructions. These human records remain open rather than being estimated from the proposal.
+Team members must confirm their actual effort, responsibilities and speakers, then add presentation feedback and responses before final submission.
 
 ## References and Evidence
 

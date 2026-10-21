@@ -1,5 +1,5 @@
 {
-  "updated_at_utc": "2026-10-21T04:01:22.985620+00:00",
+  "updated_at_utc": "2026-10-21T05:45:31.778951+00:00",
   "test_counts": {
     "core": 60,
     "workload_and_operations": 23
@@ -209,6 +209,14 @@
       "missing_api_key": 403
     }
   ],
+  "local_startup_validation": {
+    "at": "2026-10-21T05:09:37.605111+00:00",
+    "passed": true,
+    "utf8_mode": true,
+    "terraform_output_count": 17,
+    "operation": "terraform output -json",
+    "read_only": true
+  },
   "full_load": {
     "build_id": "booking-test-images:1dfa98a1-e46d-4013-a3fa-f1a478049cea",
     "generator_revision": "186f0121c53c7cb97a48e3d8b87be31a4575a9d8",
@@ -618,6 +626,14 @@
           "description": "Normal notification processing; no artificial delivery delay"
         }
       ],
+      "publication": [
+        {
+          "check": "burst_published",
+          "at": "2026-10-20T16:40:49.349877+00:00",
+          "published": 5000,
+          "publish_seconds": 287.75214750000305
+        }
+      ],
       "results": [
         {
           "passed": false,
@@ -657,6 +673,14 @@
           "description": "Simulated notification delivery cost; not the normal zero-delay drain time"
         }
       ],
+      "publication": [
+        {
+          "check": "burst_published",
+          "at": "2026-10-20T16:50:55.450577+00:00",
+          "published": 5000,
+          "publish_seconds": 72.83854009999777
+        }
+      ],
       "results": [
         {
           "passed": false,
@@ -684,15 +708,59 @@
       ]
     },
     {
-      "configuration": [],
-      "results": []
+      "configuration": [
+        {
+          "check": "test_configuration",
+          "at": "2026-10-21T04:53:04.363074+00:00",
+          "processing_delay_ms": 500,
+          "consumer_concurrency": 2,
+          "task_vcpu": 0.25,
+          "synthetic_events": 5000,
+          "booking_probe_rate": 2,
+          "description": "Simulated notification delivery cost; not the normal zero-delay drain time"
+        }
+      ],
+      "publication": [
+        {
+          "check": "burst_published",
+          "at": "2026-10-21T04:55:47.610279+00:00",
+          "published": 5000,
+          "publish_seconds": 131.3771471999935
+        }
+      ],
+      "results": [
+        {
+          "passed": true,
+          "drain_seconds": 587.2565106999973,
+          "queue_quiet_verified": true,
+          "queue_scale_out_observed": true,
+          "persisted_notifications": 5000,
+          "booking": {
+            "baseline": {
+              "requests": 62,
+              "status_counts": {
+                "201": 62
+              },
+              "successful_booking_p95_ms": 450.6942000007257
+            },
+            "burst": {
+              "requests": 1099,
+              "status_counts": {
+                "201": 1099
+              },
+              "successful_booking_p95_ms": 437.93970000115223
+            }
+          }
+        }
+      ]
     }
   ],
   "scale_in": {
-    "passed": false
+    "passed": true,
+    "elapsed_seconds": 1103.996046
   },
   "queue_reliability": {
-    "passed": false
+    "passed": true
   },
   "recovery": {
     "persistence_verified": true,
@@ -703,5 +771,143 @@
   },
   "trace_verified": true,
   "team_records": "Pending team confirmation",
-  "pending_cloud_reason": "CLI session expired; corrected cost-burst rerun, retry/DLQ/duplicate exercise, idle scale-in and final baseline/smoke await valid CLI login."
+  "final_validation": {
+    "completed": true,
+    "stages": [
+      {
+        "name": "backlog-cost-rerun",
+        "started_at": "2026-10-21T04:46:17.339827+00:00",
+        "finished_at": "2026-10-21T05:17:15.578648+00:00",
+        "exit_code": 0
+      },
+      {
+        "name": "queue-reliability",
+        "started_at": "2026-10-21T05:17:15.579694+00:00",
+        "finished_at": "2026-10-21T05:21:09.878997+00:00",
+        "exit_code": 0
+      },
+      {
+        "name": "automatic-scale-in",
+        "started_at": "2026-10-21T05:21:09.880353+00:00",
+        "finished_at": "2026-10-21T05:41:39.420100+00:00",
+        "exit_code": 0
+      },
+      {
+        "name": "final-smoke",
+        "started_at": "2026-10-21T05:42:08.765898+00:00",
+        "finished_at": "2026-10-21T05:42:27.837428+00:00",
+        "exit_code": 0
+      }
+    ],
+    "baseline": {
+      "at": "2026-10-21T05:44:09.719807+00:00",
+      "passed": true,
+      "services": [
+        {
+          "name": "merchant",
+          "desired": 2,
+          "running": 2,
+          "pending": 0,
+          "revision": 7,
+          "deployments": 1,
+          "rollout_state": "COMPLETED",
+          "healthy_tasks": 2
+        },
+        {
+          "name": "catalogue",
+          "desired": 2,
+          "running": 2,
+          "pending": 0,
+          "revision": 6,
+          "deployments": 1,
+          "rollout_state": "COMPLETED",
+          "healthy_tasks": 2
+        },
+        {
+          "name": "availability",
+          "desired": 2,
+          "running": 2,
+          "pending": 0,
+          "revision": 6,
+          "deployments": 1,
+          "rollout_state": "COMPLETED",
+          "healthy_tasks": 2
+        },
+        {
+          "name": "booking",
+          "desired": 2,
+          "running": 2,
+          "pending": 0,
+          "revision": 8,
+          "deployments": 1,
+          "rollout_state": "COMPLETED",
+          "healthy_tasks": 2
+        },
+        {
+          "name": "notification",
+          "desired": 2,
+          "running": 2,
+          "pending": 0,
+          "revision": 6,
+          "deployments": 1,
+          "rollout_state": "COMPLETED",
+          "healthy_tasks": 2
+        }
+      ],
+      "scaling_targets": [
+        {
+          "service": "booking",
+          "minimum": 2,
+          "maximum": 8,
+          "suspended": {
+            "DynamicScalingInSuspended": false,
+            "DynamicScalingOutSuspended": false,
+            "ScheduledScalingSuspended": false
+          }
+        },
+        {
+          "service": "notification",
+          "minimum": 2,
+          "maximum": 5,
+          "suspended": {
+            "DynamicScalingInSuspended": false,
+            "DynamicScalingOutSuspended": false,
+            "ScheduledScalingSuspended": false
+          }
+        },
+        {
+          "service": "merchant",
+          "minimum": 2,
+          "maximum": 2,
+          "suspended": {
+            "DynamicScalingInSuspended": false,
+            "DynamicScalingOutSuspended": false,
+            "ScheduledScalingSuspended": false
+          }
+        },
+        {
+          "service": "availability",
+          "minimum": 2,
+          "maximum": 12,
+          "suspended": {
+            "DynamicScalingInSuspended": false,
+            "DynamicScalingOutSuspended": false,
+            "ScheduledScalingSuspended": false
+          }
+        },
+        {
+          "service": "catalogue",
+          "minimum": 2,
+          "maximum": 2,
+          "suspended": {
+            "DynamicScalingInSuspended": false,
+            "DynamicScalingOutSuspended": false,
+            "ScheduledScalingSuspended": false
+          }
+        }
+      ],
+      "notification_processing_delay_ms": 0
+    }
+  },
+  "pending_cloud_reason": null
 }
