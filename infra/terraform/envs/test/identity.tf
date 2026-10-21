@@ -8,11 +8,13 @@ resource "aws_cognito_user_pool" "main" {
     allow_admin_create_user_only = true
   }
 
+  # Relaxed at the team's request so every demo account can use a short shared password.
+  # Weak by design for the test environment; restore 8+ characters with mixed case before real use.
   password_policy {
-    minimum_length    = 8
-    require_lowercase = true
-    require_uppercase = true
-    require_numbers   = true
+    minimum_length    = 6
+    require_lowercase = false
+    require_uppercase = false
+    require_numbers   = false
     require_symbols   = false
   }
 
