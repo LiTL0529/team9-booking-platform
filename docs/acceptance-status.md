@@ -19,7 +19,7 @@ Updated 21 October 2026 (UTC+8). Planned criteria, implementation and observed r
 | 5,000-event burst | See dated result appendix | Normal and optional simulated processing cost remain separate; 2/s booking probes |
 | Real queue retry / DLQ / duplicates | Verified | Dedicated synthetic malformed/duplicate messages; existing DLQ evidence preserved |
 | Final baseline and smoke | Verified | All five services at two healthy tasks, normal notification processing and original scaling policies; final end-to-end smoke |
-| Actual team effort / responsibilities / speakers | Pending team confirmation | User explicitly requested this; do not invent effort |
+| Actual team effort / responsibilities / speakers | Pending team confirmation | Confirm actual effort, responsibilities and speaking assignments from team records |
 | Final report | Template draft prepared | Team records and presentation feedback remain required before recorded 16 Nov deadline |
 
 Peak SLOs apply to both 200 HTTP/s phases. Search P95 during the 50 and 100 HTTP/s ramp stages exceeded 500 ms and remains visible in the phase table; passing peak SLOs does not establish sub-500-ms search latency at every ramp stage.
