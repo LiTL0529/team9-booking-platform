@@ -27,7 +27,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def queue_scaled_while_busy(activities, timeline):
     return (any('sqs-backlog' in str(v.get('Cause', '')) for v in activities)
-            and any(v['running'] > 2 and v['visible'] + v['in_flight'] > 0 for v in timeline))
+            and any(v['running'] > 2 and v['visible'] + v['in_flight'] > 2 for v in timeline))
+
+
+def booking_probes_can_stop(sample):
+    # Two-per-second probes can keep a one/two-message tail alive after the burst.
+    # Stop that producer near the end, then independently require a quiet queue
+    # and all 5,000 persisted synthetic notifications before accepting delivery.
+    return sample['visible'] == 0 and sample['in_flight'] <= 2
 
 
 def notification_count(checks, task_definition, customer_id):
@@ -219,6 +226,12 @@ def main():
             }
             timeline.append(sample)
             print(json.dumps(sample), flush=True)
+            if not stop.is_set() and booking_probes_can_stop(sample):
+                stop.set()
+                worker.join(35)
+                a.record('booking_probes_stopped_for_quiet_check',
+                         elapsed_seconds=time.perf_counter() - started,
+                         reason='Visible burst ended; stop the probe producer before checking queue quietness')
             empty = empty + 1 if sample["visible"] == 0 and sample["in_flight"] == 0 else 0
             if empty >= 3:
                 break
@@ -255,6 +268,9 @@ def main():
             "backlog_result",
             passed=passed,
             drain_seconds=drained_seconds,
+            drain_timing_method=(
+                'Three quiet queue samples after stopping probes near the end; exact synthetic inbox count checked separately'
+            ),
             queue_scale_out_observed=scale,
             booking=summary,
             timeline=timeline,
@@ -262,7 +278,8 @@ def main():
             persisted_notifications=persisted,
             limitation=(
                 "Low-rate booking probes test the 1s latency budget; baseline/burst difference is disclosed, "
-                "not proof of zero latency impact"
+                "not proof of zero latency impact. Probes stop when the visible burst ends with at most two in flight, "
+                "before the final queue-quiet check; persisted synthetic count must still equal 5000."
             ),
         )
         a.records.update(completed=True, passed=passed, normal_processing=(args.processing_delay_ms == 0))
